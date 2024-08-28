@@ -1,0 +1,76 @@
+# ESX-3 monomer snapshot
+
+# get structure
+fetch 6umm, async=0
+
+# representations
+sele monomer2, chain F or chain G or chain H or chain I or chain J
+hide everything, monomer2
+sele monomer1,chain A or chain B or chain C or chain D or chain E
+show surface,monomer1
+
+#colors
+#EccE Pink
+set_color epink, [255, 94, 140]
+
+#Light green
+set_color dbentgreen, [95, 146, 42]
+
+#Dark green
+set_color dextgreen, [3, 75, 4]
+
+#EccB is tv_orange
+
+#EccC Blue:
+set_color cblue, [99, 156, 214]
+
+color epink, chain A+F
+color dbentgreen, chain B+G
+color dextgreen, chain C+H
+color tv_orange, chain D+I
+color cblue, chain E+J
+
+# background color
+bg_color white
+
+# camera view
+set_view (\
+    -0.891262889,    0.266060919,   -0.367232084,\
+     0.451966852,    0.587352157,   -0.671372354,\
+     0.037068844,   -0.764346719,   -0.643737257,\
+     0.000280604,   -0.000132240, -349.803680420,\
+   192.908538818,  166.047912598,  199.552841187,\
+   231.853729248,  467.781585693,  -20.000000000 )
+
+#Settings. Transparent background, 60% transparent surface, depth & reflective light off
+set ray_opaque_background, off
+set transparency, 0.6
+set depth_cue, off
+set specular, 0
+
+#Highlight EccD3 hits at interfaces. So, highlight scores & also the rest of ESX-3 monomer.
+set transparency,0.6
+color white, eccD3_CS_avgmissense
+spectrum b, red_white_blue, CS_targets, minimum=-1.75,maximum=1.75
+
+
+#take high res ray traced pic
+ray
+
+#save output
+ray
+png /Users/dtrinidad/Desktop/Paper/pymolfigs/Fig1/ESX3_dimer_cartoon
+
+show surface,6umm
+show surface, eccD3_CS_avgmissense
+set transparency,0.8
+set transparency, 0,eccD3_CS_avgmissense
+
+
+set_view (\
+    -0.617873132,   -0.781075358,    0.090320714,\
+    -0.127711400,    0.213037968,    0.968659461,\
+    -0.775837898,    0.586971939,   -0.231382385,\
+    -0.000627894,   -0.001071095, -161.759857178,\
+   209.819732666,  124.958419800,  235.589248657,\
+    56.902381897,  266.590087891,  -20.000000000 )

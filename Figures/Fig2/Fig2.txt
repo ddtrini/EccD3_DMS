@@ -1,0 +1,65 @@
+# ESX-3 snapshot
+
+# get structure
+fetch 6umm, async=0
+
+# representations
+sele monomer2, chain F or chain G or chain H or chain I or chain J
+sele monomer1,chain A or chain B or chain C or chain D or chain E
+
+#colors
+#EccE Pink
+set_color epink, [255, 94, 140]
+
+#Light green
+set_color dbentgreen, [95, 146, 42]
+
+#Dark green
+set_color dextgreen, [3, 75, 4]
+
+#EccB is tv_orange
+
+#EccC Blue:
+set_color cblue, [99, 156, 214]
+
+color epink, chain A+F
+color dbentgreen, chain B+G
+color dextgreen, chain C+H
+color tv_orange, chain D+I
+color cblue, chain E+J
+
+# background color
+bg_color white
+
+#Settings. Transparent background, 60% transparent surface, depth & reflective light off
+set ray_opaque_background, off
+set transparency, 0.6
+set depth_cue, off
+set specular, 0
+show surface
+set ray_trace_mode, 1
+set ray_shadows, off
+set
+
+spectrum b,  red_white_blue, eccD3_CS_avgmissense and resi 1-100, minimum=-2,maximum = 2
+color white, resi 91-94+99-101
+
+set_view (\
+    -0.944184840,    0.251859635,    0.212321326,\
+    -0.040781874,    0.550214052,   -0.834025860,\
+    -0.326879323,   -0.796134472,   -0.509232938,\
+     0.000138104,    0.000024438, -435.904235840,\
+   177.348815918,  171.523971558,  202.995285034,\
+   317.938446045,  553.866027832,  -20.000000000 )
+
+#take high res ray traced pic
+ray
+
+#save output
+ray
+png /Users/dtrinidad/Desktop/Paper/Figures/Fig1/ESX3_dimer_cartoon
+
+show surface,6umm
+show surface, eccD3_CS_avgmissense
+set transparency,0.8
+set transparency, 0,eccD3_CS_avgmissense
