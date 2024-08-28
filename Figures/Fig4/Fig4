@@ -1,0 +1,134 @@
+fetch 6umm
+
+#colors
+#EccE Pink
+set_color epink, [255, 94, 140]
+
+#Light green
+set_color dbentgreen, [95, 146, 42]
+
+#Dark green
+set_color dextgreen, [3, 75, 4]
+
+#EccB is tv_orange
+
+#EccC Blue:
+set_color cblue, [99, 156, 214]
+
+color epink, chain A+F
+color dbentgreen, chain B+G
+color dextgreen, chain C+H
+color tv_orange, chain D+I
+color cblue, chain E+J
+
+#Move them apart
+translate [30, 0, 0], Dext
+translate [-30, 0, 0], Dbent
+
+translate [30, 0, 0], Ubl
+translate [-30, 0, 0], 1ubq
+
+
+set ray_opaque_background, off
+set transparency, 0.6
+set depth_cue, off
+set specular, 0
+show surface
+set ray_trace_mode, 1
+set ray_shadows, off
+
+sele proto2, chain F or chain G or chain H or chain I or chain J
+sele proto1,chain A or chain B or chain C or chain D or chain E
+
+spectrum b,  red_white_blue, eccD3_CS_avgmissense, minimum=-2,maximum = 2
+
+#Front view of ESX3 dimer, D3 colored by DMS score
+
+
+png /Users/dtrinidad/Desktop/Paper/Figures/Fig4/ESX3dimer_proto1Ds_trans_surface
+
+#Back view
+set cartoon_transparency,0.5,6umm
+set cartoon_transparency,0,6umm and chain D+E
+
+spectrum b,  red_white_blue, eccD3_CS_avgmissense and resi 101-130, minimum=-2,maximum = 2
+set_view (\
+    -0.930370748,    0.233308196,    0.282803714,\
+    -0.105046615,    0.569393575,   -0.815324962,\
+    -0.351249337,   -0.788261235,   -0.505237877,\
+     0.000492096,    0.000396729, -1123.505981445,\
+     3.996154785,  725.191894531,  544.314086914,\
+  -2518.220214844, 4765.237304688,  -20.000000000 )
+
+  png /Users/dtrinidad/Desktop/Paper/Figures/Fig4/ESX3dimer_proto1Ds_back_moretrans_surface
+
+
+  #Saved session notes
+  spectrum b, red_white_blue, eccD3_CS_avgmissense, minimum=-1.75,maximum=1.75
+  hide cartoon, 6umm and chain B+C
+  color dbentgreen, chain B
+
+  set_view (\
+    -0.962534189,    0.235007107,    0.135268867,\
+     0.014286318,    0.542115748,   -0.840182185,\
+    -0.270780355,   -0.806772351,   -0.525161862,\
+     0.000514273,    0.000059202, -400.341308594,\
+   185.251678467,  176.084335327,  205.383010864,\
+    91.476486206,  709.227966309,  -20.000000000 )
+
+ray
+png /Users/dtrinidad/Desktop/Paper/Figures/Fig4/ESX3dimer_bent_colors
+
+
+#EccD linker and EccE
+hide cartoon, chain A and (not resi 131-165)
+hide cartoon, chain B and resi 301-320
+show licorice, chain A and resi 138+154
+show licorice, CS_miss1 and chain B and resi 15+24
+
+set_view (\
+     0.938620567,    0.344447792,    0.017994553,\
+    -0.025280235,    0.016672777,    0.999528766,\
+     0.343989551,   -0.938645244,    0.024360752,\
+    -0.004967148,    0.001431033,  -80.169631958,\
+   211.901794434,  150.328109741,  215.177795410,\
+  -864.546997070, 1024.530029297,  -20.000000000 )
+
+ray
+png /Users/dtrinidad/Desktop/Paper/Figures/Fig4/Extlinker_EccE_colors
+
+PyMOL>rotate y,-90
+PyMOL>hide cartoon, chain E
+PyMOL>hide cartoon, chain B
+PyMOL>hide licorice, chain B
+
+hide everything, CS_miss1 and chain C
+hide surface
+
+show licorice, CS_charge1 and chain C and resi 107-113
+
+ray
+png /Users/dtrinidad/Desktop/Paper/Figures/Fig4/Extlinker_EccE_colors
+
+color white, chain A+B
+ray
+png /Users/dtrinidad/Desktop/Paper/Figures/Fig4/Extlinker_EccE_DMS_white
+
+#EccD linker and EccB and EccC
+hide cartoon, chain D and resi 54-61
+hide cartoon, chain E and resi 170-210
+hide cartoon, chain C
+show licorice, chain E and resi 112-113+116
+show licorice, chain D and resi 47
+hide cartoon, chain D and resi 15-32
+
+set_view (\
+    -0.363231122,    0.192809850,   -0.911515594,\
+     0.923638403,    0.202832580,   -0.325155735,\
+     0.122197203,   -0.960032344,   -0.251765668,\
+    -0.000791255,    0.001582278,  -80.573173523,\
+   264.784027100,  143.528915405,  202.891906738,\
+  -769.036376953,  931.132751465,  -20.000000000 )
+
+  ray
+  png /Users/dtrinidad/Desktop/Paper/Figures/Fig4/Bentlinker_EccBX_DMS_white
