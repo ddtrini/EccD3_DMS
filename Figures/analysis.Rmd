@@ -1,0 +1,2093 @@
+---
+title: "EccD3_DMS_Plotting Notebook"
+output: html_notebook
+---
+
+```{r}
+library(ggplot2)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(bio3d)
+
+source("dms_analysis_utilities.R")
+source("plot_heatmap.R")
+source("map_pdb.R")
+```
+
+```{r}
+#Rewrite scores tables
+# Enrich2 score files
+eccd_scores_file = "eccd_jan_scores.csv"
+
+eccd_variantscore_colnames <- c("hgvs", "CS_tile1_SE", "CS_tile1_epsilon", "CS_tile1_score", "CS_tile2_SE", "CS_tile2_epsilon", "CS_tile2_score", "CS_tile3_SE", "CS_tile3_epsilon", "CS_tile3_score", "Fe_tile1_SE", "Fe_tile1_epsilon", "Fe_tile1_score", "Fe_tile2_SE", "Fe_tile2_epsilon", "Fe_tile2_score", "Fe_tile3_SE", "Fe_tile3_epsilon", "Fe_tile3_score")
+
+eccd_scores <- read_delim(eccd_scores_file, col_names = eccd_variantscore_colnames, skip=3)
+eccd_scores <- process_hgvs_df(eccd_scores)
+
+eccd_scores$is.wt = eccd_scores$mutation_type == "S"
+
+# combine each tile's scores into a single score for each condition (CS or Fe)
+# if two tiles have the same mutation, take the average of the two scores
+# otherwise use whichever tile is not NA
+eccd_scores$CS_score = rowMeans(eccd_scores[,c("CS_tile1_score", "CS_tile2_score", "CS_tile3_score")], na.rm=TRUE)
+eccd_scores$Fe_score = rowMeans(eccd_scores[,c("Fe_tile1_score", "Fe_tile2_score", "Fe_tile3_score")], na.rm=TRUE)
+
+# now combine the two experiments into a single dataframe
+eccd_scores$experiment = "EccD"
+eccd_scores = rbind(eccd_scores)
+
+# Check if there are any mutations that are seen in multiple tiles
+dim(eccd_scores %>% filter(!is.na(CS_tile1_score) & !is.na(CS_tile2_score)))
+dim(eccd_scores %>% filter(!is.na(CS_tile3_score) & !is.na(CS_tile2_score)))
+dim(eccd_scores %>% filter(!is.na(CS_tile1_score) & !is.na(CS_tile3_score)))
+
+dim(eccd_scores %>% filter(!is.na(Fe_tile1_score) & !is.na(Fe_tile2_score)))
+dim(eccd_scores %>% filter(!is.na(Fe_tile3_score) & !is.na(Fe_tile2_score)))
+dim(eccd_scores %>% filter(!is.na(Fe_tile1_score) & !is.na(Fe_tile3_score)))
+
+
+write.csv(eccd_scores, "../eccd_janscores.csv", row.names = FALSE)
+
+```
+
+```{r}
+# Load the EccD reference sequence
+
+eccd_wt_fasta = "dumpling/references/EccD_ref.fasta"
+
+con=file(eccd_wt_fasta,open="r")
+eccd_wt = readLines(con)[2]
+close(con)
+```
+#Density plot
+```{r}
+#Plot variant density plots
+CST1 <- ggplot(eccd_scores %>% filter(mutation_type != "X")) +
+  geom_density(aes(x = CS_tile1_score, color=mutation_type), bw = "nrd0", kernel='gaussian', linewidth=1) +
+  xlab("Enrich2 score") +
+  ylab("Density") +
+  geom_vline(xintercept = 0, linetype="dotted") +
+  theme_classic() +
+  ggtitle("Chelated media, Tile 1") +
+  scale_color_manual(values=colorscheme_1) +
+  labs(color = "Mutation type")
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/CS_T1_densityMut.png", plot = CST1, width = 8, height = 6, dpi = 300)
+
+
+CST2 <- ggplot(eccd_scores %>% filter(mutation_type != "X")) +
+  geom_density(aes(x = CS_tile2_score, color=mutation_type), bw = "nrd0", kernel='gaussian', linewidth=1) +
+  xlab("Enrich2 score") +
+  ylab("Density") +
+  geom_vline(xintercept = 0, linetype="dotted") +
+  theme_classic() +
+  ggtitle("Chelated media, Tile 2") +
+  scale_color_manual(values=colorscheme_1) +
+  labs(color = "Mutation type")
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/CS_T2_densityMut.png", plot = CST2, width = 8, height = 6, dpi = 300)
+
+CST3 <- ggplot(eccd_scores %>% filter(mutation_type != "X")) +
+  geom_density(aes(x = CS_tile3_score, color=mutation_type), bw = "nrd0", kernel='gaussian', linewidth=1) +
+  xlab("Enrich2 score") +
+  ylab("Density") +
+  geom_vline(xintercept = 0, linetype="dotted") +
+  theme_classic() +
+  ggtitle("Chelated media, Tile 3") +
+  scale_color_manual(values=colorscheme_1) +
+  labs(color = "Mutation type")
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/CS_T3_densityMut.png", plot = CST3, width = 8, height = 6, dpi = 300)
+
+FeT1 <- ggplot(eccd_scores %>% filter(mutation_type != "X")) +
+  geom_density(aes(x = Fe_tile1_score, color=mutation_type), bw = "nrd0", kernel='gaussian', linewidth=1) +
+  xlab("Enrich2 score") +
+  ylab("Density") +
+  geom_vline(xintercept = 0, linetype="dotted") +
+  theme_classic() +
+  ggtitle("Iron replete media, Tile 1") +
+  scale_color_manual(values=colorscheme_1) +
+  labs(color = "Mutation type")
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/Fe_T1_densityMut.png", plot = FeT1, width = 8, height = 6, dpi = 300)
+
+FeT2 <- ggplot(eccd_scores %>% filter(mutation_type != "X")) +
+  geom_density(aes(x = Fe_tile2_score, color=mutation_type), bw = "nrd0", kernel='gaussian', linewidth=1) +
+  xlab("Enrich2 score") +
+  ylab("Density") +
+  geom_vline(xintercept = 0, linetype="dotted") +
+  theme_classic() +
+  ggtitle("Iron replete media, Tile 2") +
+  scale_color_manual(values=colorscheme_1) +
+  labs(color = "Mutation type")
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/Fe_T2_densityMut.png", plot = FeT2, width = 8, height = 6, dpi = 300)
+
+FeT3 <- ggplot(eccd_scores %>% filter(mutation_type != "X")) +
+  geom_density(aes(x = Fe_tile3_score, color=mutation_type), bw = "nrd0", kernel='gaussian', linewidth=1) +
+  xlab("Enrich2 score") +
+  ylab("Density") +
+  geom_vline(xintercept = 0, linetype="dotted") +
+  theme_classic() +
+  ggtitle("Iron replete media, Tile 3") +
+  scale_color_manual(values=colorscheme_1) +
+  labs(color = "Mutation type")
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/Fe_T3_densityMut.png", plot = FeT3, width = 8, height = 6, dpi = 300)
+
+CSavgden <- ggplot(eccd_scores %>% filter(mutation_type != "X" & experiment == "EccD")) +
+  geom_density(aes(x = CS_score, color=mutation_type), bw = "nrd0", kernel='gaussian', linewidth=1) +
+  xlab("Enrich2 score") +
+  ylab("Density") +
+  geom_vline(xintercept = 0, linetype="dotted") +
+  theme_classic() +
+  ggtitle("Chelated media, avg") +
+  scale_color_manual(values=colorscheme_1) +
+  labs(color = "Mutation type")
+
+CSavgden
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/CS_avg_densityMut.png", plot = CSavgden, width = 8, height = 6, dpi = 300)
+
+Feavgden <- ggplot(eccd_scores %>% filter(mutation_type != "X" & experiment == "EccD")) +
+  geom_density(aes(x = Fe_score, color=mutation_type), bw = "nrd0", kernel='gaussian', linewidth=1) +
+  xlab("Enrich2 score") +
+  ylab("Density") +
+  geom_vline(xintercept = 0, linetype="dotted") +
+  theme_classic() +
+  ggtitle("Iron replete media, avg") +
+  scale_color_manual(values=colorscheme_1) +
+  labs(color = "Mutation type")
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/Fe_avg_densityMut.png", plot = Feavgden, width = 8, height = 6, dpi = 300)
+```
+
+#Heatmap
+```{r}
+#Print heatmap
+source("dms_analysis_utilities.R")
+source("plot_heatmap.R")
+
+order <- c("average", "hydrophobic", "aromatic", "aliphatic", "polar", "charged", "positive", "negative", "small", "tiny", "G", "A", "I", "L", "V", "C", "M", "S", "T", "K",
+           "R", "H", "D", "E", "N", "Q", "F", "W", "Y", "P",
+           "X")
+
+variant_names <- c("average", "hydrophobic", "aromatic", "aliphatic", "polar", "charged", "positive", "negative", "small", "tiny", "G", "A", "I", "L", "V", "C", "M", "S", "T", "K",
+           "R", "H", "D", "E", "N", "Q", "F", "W", "Y", "P","*")
+
+source("plot_heatmap.R")
+print_heatmap(eccd_scores %>% filter(experiment == "EccD" & hgvs != "_wt"), CS_score, scale = TRUE, invert_scale = FALSE, eccD3_wt, output_file = "output/heatmap_CS.pdf", order_in = order, names = variant_names)
+
+print_heatmap(eccd_scores %>% filter(experiment == "EccD" & hgvs != "_wt"), Fe_score, scale = TRUE, invert_scale = FALSE, eccD3_wt, output_file = "output/heatmap_FeS.pdf", order_in = order, names = variant_names)
+
+#Plot physicochemistry as well! First, the physicochem scores themselves
+phys_missense_means = read.csv("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/physicochemistry_missense_means.csv")
+
+some_phys_means = read.csv("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/some_phys_missense_means.csv")
+
+#All missense swaps AND some relevant physicochemistry
+allvar_somephys = read.csv("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/heatmap_phys_test.csv")
+
+#Just avg physicochem
+source("plot_heatmap_fixedCSbounds.R")
+print_heatmap(some_phys_means %>% filter(pos != "-1"), CS_score, scale = TRUE, invert_scale = FALSE, eccD3_wt, output_file = "output/heatmap_CS_somephys.pdf", order_in = order, names = variant_names)
+
+source("plot_heatmap_fixedFeSbounds.R")
+print_heatmap(some_phys_means %>% filter(pos != "-1"), Fe_score, scale = TRUE, invert_scale = FALSE, eccD3_wt, output_file = "output/heatmap_FeS_somephys.pdf", order_in = order, names = variant_names)
+
+#Label data based on LOF or GOF
+heatmap_phys_ranked <- allvar_somephys
+heatmap_phys_ranked <- heatmap_phys_ranked %>%
+  mutate(
+    CS_phenotype = case_when(
+      CS_score > 1.5 ~ "GOF",
+      CS_score <= 1.5 & CS_score >= -1 ~ "tolerant",
+      CS_score < -1 & CS_score >= -2.5 ~ "weak LOF",
+      CS_score < -2.5 ~ "strong LOF",
+      TRUE ~ NA_character_  # For values outside the specified range
+    )
+  )
+
+heatmap_phys_ranked <- heatmap_phys_ranked %>%
+  mutate(
+    FeS_phenotype = case_when(
+      Fe_score > .65 ~ "GOF",
+      Fe_score <= 0.65 & Fe_score >= -0.8 ~ "tolerant",
+      Fe_score < -0.8 & Fe_score >= -1.4 ~ "weak LOF",
+      Fe_score < -1.4 ~ "strong LOF",
+      TRUE ~ NA_character_  # For values outside the specified range
+    )
+  )
+
+write.csv(heatmap_phys_ranked, "output/eccd_scores_allvarsomephys_ranked.csv", row.names=FALSE)
+
+heatmap_phys_ranked <- read.csv("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/eccd_scores_allvarsomephys_ranked.csv")
+
+```
+#Scatterplot btwn conditions
+```{r}
+
+scatter_options <- theme(
+    plot.title = element_text(hjust = 0.5, size = 25, family = "sans", color = "black"),
+    axis.title.x = element_text(size = 20, family = "sans", color = "black", margin = margin(t = 10, r = 10, b = 0, l = 10)),
+    axis.title.y = element_text(size = 20, family = "sans", color = "black", margin = margin(t = 10, r = 10, b = 0, l = 10)),
+    axis.text = element_text(size = 20, family = "sans", color = "black"),
+    legend.text = element_text(size = 20, family = "sans", color = "black"),
+    legend.title = element_text(size = 20, family = "sans", color = "black"),
+    plot.subtitle = element_text(size = 15, family = "sans", color = "black"),
+    plot.caption = element_text(size = 15, family = "sans", color = "black"),
+  )
+
+#Linear regression model fit to the syn data
+wt_data <- eccd_scores %>% filter(is.wt == TRUE, experiment == "EccD" & hgvs != "_wt")
+lm_wt <- lm(Fe_score ~ CS_score, data = wt_data)
+lm_all <- lm(Fe_score ~ CS_score, data = eccd_scores)
+miss_data <- eccd_scores %>% filter(is.wt == FALSE, experiment == "EccD" & hgvs != "_wt" & mutation_type == "M")
+lm_miss <- lm(Fe_score ~ CS_score, data = miss_data)
+non_data <- eccd_scores %>% filter(is.wt == FALSE, experiment == "EccD" & hgvs != "_wt" & mutation_type == "N")
+lm_non <- lm(Fe_score ~ CS_score, data = non_data)
+
+# Extract the coefficients for the line
+intercept <- coef(lm_wt)[1]
+slope <- coef(lm_wt)[2]
+r_squared <- summary(lm_wt)$r.squared
+r_squared_miss <- summary(lm_miss)$r.squared
+r_squared_non <- summary(lm_non)$r.squared
+
+euclidean_distance <- function(x, y, slope, intercept) {
+  abs(slope * x - y + intercept) / sqrt(slope^2 + 1)
+}
+
+eccd_scores <- eccd_scores %>%
+  mutate(distance_from_line = euclidean_distance(CS_score, Fe_score, slope, intercept))
+
+# Filter the data for each mutation type separately
+M_data <- eccd_scores %>% filter(mutation_type == "M")
+N_data <- eccd_scores %>% filter(mutation_type == "N")
+S_data <- eccd_scores %>% filter(mutation_type == "S")
+
+# make a scatterplot of scores between conditions
+CSvsFe_scatter <- ggplot(eccd_scores %>% filter(experiment == "EccD" & hgvs != "_wt")) +
+  geom_point(data = M_data, aes(x = CS_score, y = Fe_score, color = mutation_type), alpha = 0.75, size = 1.5) +
+  geom_point(data = N_data, aes(x = CS_score, y = Fe_score, color = mutation_type), alpha = 0.75, size = 1.5) +
+  geom_point(data = S_data, aes(x = CS_score, y = Fe_score, color = mutation_type), alpha = 0.75, size = 1.5) +
+  geom_abline(intercept = intercept, slope = slope, linetype = "solid", color = "black", size = 1) +
+  xlab("Iron sufficient score") +
+  ylab("Iron deficient score") +
+  theme_classic () +
+  ggtitle("Enrich2 Scores") +
+  scale_color_manual(values = c("S" = "#000000", "N" = "#DC3220", "M" = "#1E88E5")) +
+  coord_fixed() +
+  labs(color = "Mutation type") +
+    scatter_options
+
+print(CSvsFe_scatter)
+
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/Fig2/CSvsFe_scatter.png", plot = CSvsFe_scatter, width = 8, height = 6, dpi = 600)
+
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/Fig2/CSvsFe_scatter.pdf", plot = CSvsFe_scatter, width = 8, height = 6, dpi = 600)
+
+CSvsFe_scatter_regression <- ggplot(eccd_scores %>% filter(experiment == "EccD" & hgvs != "_wt")) +
+  geom_point(data = M_data, aes(x = CS_score, y = Fe_score, color = mutation_type), alpha = 0.75, size = 1.5) +
+  geom_point(data = N_data, aes(x = CS_score, y = Fe_score, color = mutation_type), alpha = 0.75, size = 1.5) +
+  geom_point(data = S_data, aes(x = CS_score, y = Fe_score, color = mutation_type), alpha = 0.75, size = 1.5) +
+  geom_abline(intercept = intercept, slope = slope, linetype = "solid", color = "black", size = 1) +
+  xlab("Iron sufficient score") +
+  ylab("Iron deficient score") +
+  theme_classic () +
+  ggtitle("Enrich2 Scores") +
+  scale_color_manual(values = c("S" = "#000000", "N" = "#DC3220", "M" = "#1E88E5")) +
+  coord_fixed() +
+  labs(color = "Mutation type") +
+  annotate("text", x = max(eccd_scores$CS_score, na.rm = TRUE), y = max(eccd_scores$Fe_score, na.rm = TRUE), 
+           label = paste("R² S =", round(r_squared, 3)), 
+           hjust = 1, vjust = 1, size = 4, color = "black") +
+  annotate("text", x = max(eccd_scores$CS_score, na.rm = TRUE), y = max(eccd_scores$Fe_score, na.rm = TRUE) - 0.4, 
+           label = paste("R² M =", round(r_squared_miss, 3)), 
+           hjust = 1, vjust = 1, size = 4, color = "black") +
+    annotate("text", x = max(eccd_scores$CS_score, na.rm = TRUE), y = max(eccd_scores$Fe_score, na.rm = TRUE) - 0.8, 
+           label = paste("R² N =", round(r_squared_non, 3)), 
+           hjust = 1, vjust = 1, size = 4, color = "black") +
+    scatter_options
+
+print(CSvsFe_scatter_regression)
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/CSvsFe_scatter_regression1.png", plot = CSvsFe_scatter_regression1, width = 8, height = 6, dpi = 600)
+
+#Compare domains, just missense
+CSvsFe_AllDomainsmissense_scatter <- ggplot(eccd_scores %>% filter(experiment == "EccD" & hgvs != "_wt" & mutation_type == "M")) +
+  geom_point(aes(x = CS_score, y = Fe_score,
+                 color = factor(case_when(
+                   pos >= 1 & pos <= 99 ~ "Ubl",
+                   pos >= 100 & pos <= 130 ~ "Linker",
+                   pos > 130 ~ "TMs"
+                 ))), alpha = 0.3, size = 1) +
+  xlab("Enrich2 score (CS)") +
+  ylab("Enrich2 score (Fe)") +
+  theme_classic() +
+  ggtitle("Missense mutations, CS vs Fe Score") +
+  scale_color_manual(values = c("Ubl" = "blue", "Linker" = "red", "TMs" = "darkgreen")) +
+  coord_fixed() +
+  labs(color = "Domain")
+
+CSvsFe_AllDomainsmissense_scatterLOB.png <- CSvsFe_AllDomainsmissense_scatter + geom_abline(intercept = coef(lm(Fe_score ~ CS_score, data = eccd_scores %>% filter(experiment == "EccD" & hgvs != "_wt")))[1],
+                                 slope = coef(lm(Fe_score ~ CS_score, data = eccd_scores %>% filter(experiment == "EccD" & hgvs != "_wt")))[2],
+                                 linetype = "dotted", color = "black")
+
+print(CSvsFe_AllDomainsmissense_scatterLOB.png)
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/CSvsFe_AllDomainsmissense_scatterLOB.png", plot = CSvsFe_AllDomainsmissense_scatterLOB.png, width = 8, height = 6, dpi = 600)
+
+#Compare just the domains
+eccd_labled_scores <- eccd_scores %>%
+  mutate(pos_category = case_when(
+    pos >= 1 & pos <= 99 ~ "Ubl",
+    pos >= 100 & pos <= 130 ~ "linker",
+    pos > 130 ~ "TM"
+  ))
+
+eccd_TM_scores <- eccd_labled_scores %>%
+  filter(pos_category == "TM")
+
+#Just TMs
+TM_miss_data <- eccd_TM_scores %>% filter(is.wt == FALSE, experiment == "EccD" & hgvs != "_wt" & mutation_type == "M")
+TM_lm_miss <- lm(Fe_score ~ CS_score, data = TM_miss_data)
+
+# Extract the coefficients for the line
+intercept_TM <- coef(TM_lm_miss)[1]
+slope_TM <- coef(TM_lm_miss)[2]
+r_squared_TM <- summary(TM_lm_miss)$r.squared
+
+CSvsFe_TMmissense_scatter <- ggplot(eccd_TM_scores %>% filter(experiment == "EccD" & hgvs != "_wt" & mutation_type == "M")) +
+  geom_point(aes(x = CS_score, y = Fe_score), color = "darkgreen", alpha = 0.75, size = 1.5) +
+  geom_abline(intercept = intercept_TM, slope = slope_TM, linetype = "solid", color = "black", size = 1) +
+  xlab("Iron sufficient score") +
+  ylab("Iron deficient score") +
+  theme_classic() +
+  ggtitle("TM domain missense scores") +
+  coord_fixed() +
+    scatter_options
+
+print(CSvsFe_TMmissense_scatter)
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/CSvsFe_TMmissense_scatter.png", plot = CSvsFe_TMmissense_scatter, width = 8, height = 6, dpi = 600)
+
+theme_options <- theme(
+    plot.title = element_text(hjust = 0.5, size = 30, family = "sans", color = "black"),
+    axis.title.x = element_text(size = 24, family = "sans", color = "black", margin = margin(t = 10, r = 10, b = 0, l = 10)),
+    axis.title.y = element_text(size = 24, family = "sans", color = "black", margin = margin(t = 10, r = 10, b = 0, l = 10)),
+    axis.text = element_text(size = 20, family = "sans", color = "black"),
+    legend.text = element_text(size = 20, family = "sans", color = "black"),
+    legend.title = element_text(size = 20, family = "sans", color = "black"),
+    plot.subtitle = element_text(size = 15, family = "sans", color = "black"),
+    plot.caption = element_text(size = 15, family = "sans", color = "black"),
+  )
+
+scatter_options <- theme(
+    plot.title = element_text(hjust = 0.5, size = 25, family = "sans", color = "black"),
+    axis.title.x = element_text(size = 20, family = "sans", color = "black", margin = margin(t = 10, r = 10, b = 0, l = 10)),
+    axis.title.y = element_text(size = 20, family = "sans", color = "black", margin = margin(t = 10, r = 10, b = 0, l = 10)),
+    axis.text = element_text(size = 20, family = "sans", color = "black"),
+    legend.text = element_text(size = 20, family = "sans", color = "black"),
+    legend.title = element_text(size = 20, family = "sans", color = "black"),
+    plot.subtitle = element_text(size = 15, family = "sans", color = "black"),
+    plot.caption = element_text(size = 15, family = "sans", color = "black"),
+  )
+
+gc_options <- theme(
+    plot.title = element_text(hjust = 0.5, size = 20, family = "sans", color = "black"),
+    axis.title.x = element_text(size = 20, family = "sans", color = "black", margin = margin(t = 10, r = 10, b = 0, l = 10)),
+    axis.title.y = element_text(size = 20, family = "sans", color = "black", margin = margin(t = 10, r = 10, b = 0, l = 10)),
+    axis.text = element_text(size = 15, family = "sans", color = "black"),
+    legend.text = element_text(size = 17.5, family = "sans", color = "black"),
+    legend.title = element_text(size = 20, family = "sans", color = "black"),
+    plot.subtitle = element_text(size = 15, family = "sans", color = "black"),
+    plot.caption = element_text(size = 15, family = "sans", color = "black"),
+  )
+
+```
+
+```{r}
+
+# Make a wide df of scores
+eccd_scores_wide <- eccd_scores %>%
+  filter(hgvs != "_wt") %>%
+  select(hgvs, CS_score, Fe_score, experiment, mutation_type) %>%
+  pivot_wider(names_from = experiment, values_from = c(CS_score, Fe_score))
+
+```
+
+```{r}
+# Make a scatterplot of scores between tiles
+
+CS_T1vsT2_scatter <- ggplot(eccd_scores %>% filter(experiment == "EccD" & hgvs != "_wt")) +
+  geom_point(aes(x = CS_tile1_score, y = CS_tile2_score,
+                 color = mutation_type), alpha = 0.3, size = 1) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dotted") +
+  xlab("Tile 1 score (CS)") +
+  ylab("Tile 2 score (CS)") +
+  theme_classic() +
+  ggtitle("CS T1 vs T2 Score") +
+  scale_color_manual(values=colorscheme_1) +
+  coord_fixed() +
+  labs(color = "Mutation type")
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/CS_T1vsT2_scatter.png", plot = CS_T1vsT2_scatter, width = 8, height = 6, dpi = 600)
+
+
+CS_T2vsT3_scatter <- ggplot(eccd_scores %>% filter(experiment == "EccD" & hgvs != "_wt")) +
+  geom_point(aes(x = CS_tile2_score, y = CS_tile3_score,
+                 color = mutation_type), alpha = 0.3, size = 1) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dotted") +
+  xlab("Tile 2 score (CS)") +
+  ylab("Tile 3 score (CS)") +
+  theme_classic() +
+  ggtitle("CS T2 vs T3 Score") +
+  scale_color_manual(values=colorscheme_1) +
+  coord_fixed() +
+  labs(color = "Mutation type")
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/CS_T2vsT3_scatter.png", plot = CS_T2vsT3_scatter, width = 8, height = 6, dpi = 600)
+
+
+Fe_T1vsT2_scatter <- ggplot(eccd_scores %>% filter(experiment == "EccD" & hgvs != "_wt")) +
+  geom_point(aes(x = Fe_tile1_score, y = Fe_tile2_score,
+                 color = mutation_type), alpha = 0.3, size = 1) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dotted") +
+  xlab("Tile 1 score (Fe)") +
+  ylab("Tile 2 score (Fe)") +
+  theme_classic() +
+  ggtitle("Fe T1 vs T2 Score") +
+  scale_color_manual(values=colorscheme_1) +
+  coord_fixed() +
+  labs(color = "Mutation type")
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/Fe_T1vsT2_scatter.png", plot = Fe_T1vsT2_scatter, width = 8, height = 6, dpi = 600)
+
+
+Fe_T2vsT3_scatter <- ggplot(eccd_scores %>% filter(experiment == "EccD" & hgvs != "_wt")) +
+  geom_point(aes(x = Fe_tile2_score, y = Fe_tile3_score,
+                 color = mutation_type), alpha = 0.3, size = 1) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dotted") +
+  xlab("Tile 2 score (Fe)") +
+  ylab("Tile 3 score (Fe)") +
+  theme_classic() +
+  ggtitle("Fe T2 vs T3 Score") +
+  scale_color_manual(values=colorscheme_1) +
+  coord_fixed() +
+  labs(color = "Mutation type")
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/Fe_T2vsT3_scatter.png", plot = Fe_T2vsT3_scatter, width = 8, height = 6, dpi = 600)
+
+```
+
+```{r}
+#plot avg scores
+avg_scores <- eccd_scores %>% 
+  group_by(pos) %>%
+  summarise(avg_CS = mean(CS_score, na.rm=TRUE),
+            avg_Fe = mean(Fe_score, na.rm=TRUE))
+
+write.csv(avg_scores, "/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/avg_scores.csv", row.names = FALSE)
+            
+avgCSdensity <- ggplot(avg_scores) +
+  geom_density(aes(x = avg_CS), bw = "nrd", kernel='gaussian', linewidth=1) +
+  xlab("Average Enrich2 score at position") + 
+  ylab("Density") + 
+  geom_vline(xintercept = 0, linetype="dotted") +
+  theme_classic() + 
+  ggtitle("Chelated media") +
+  scale_color_manual(values=colorscheme_1)
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/CSavgdensity.png", plot = avgCSdensity, width = 8, height = 6, dpi = 300)
+
+avgFedensity <- ggplot(avg_scores) +
+  geom_density(aes(x = avg_Fe), bw = "nrd", kernel='gaussian', linewidth=1) +
+  xlab("Average Enrich2 score at position") + 
+  ylab("Density") + 
+  geom_vline(xintercept = 0, linetype="dotted") +
+  theme_classic() + 
+  ggtitle("Iron replete media")
+  scale_color_manual(values=colorscheme_1)
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/Feavgdensity.png", plot = avgFedensity, width = 8, height = 6, dpi = 300)
+  
+```
+
+#Map onto structure
+```{r}
+#Map avg score onto structure
+#To look at scores colored run this: spectrum b, red_white_blue, eccD3_protomer_CS, minimum=-1, maximum=1
+DMS_6umm <- read.pdb("structures/6umm.pdb")
+eccD3_protomer <- read.pdb("structures/eccD3_protomer.pdb")
+
+x = map_scores_pdb(DMS_6umm, avg_scores, "avg_CS")
+write.pdb(x, file="output/structures/6umm_CS.pdb")
+x = map_scores_pdb(DMS_6umm, avg_scores, "avg_Fe")
+write.pdb(x, file="output/structures/6umm_Fe.pdb")
+
+x = map_scores_pdb(eccD3_protomer, avg_scores, "avg_CS")
+write.pdb(x, file="output/structures/eccD3_protomer_CS.pdb")
+x = map_scores_pdb(eccD3_protomer, avg_scores, "avg_Fe")
+write.pdb(x, file="output/structures/eccD3_protomer_Fe.pdb")
+
+```
+
+#Physicochemistry definitions
+```{r}
+#Define physicochemistries
+order <- c('aromatic','aliphatic', 'hydrophobic','branched', 'tiny', 'small',
+          'polar','charged','negative','positive','polar_neutral','helix_break')
+hydrophobic<- c('I','L','V','M','C','A','T','H','K','W','Y','F')
+aromatic<- c('W','F','Y','H')
+aliphatic<- c('V','A','L','I')
+small<- c('C','V','A','C','T','S','G')
+tiny<- c('G','S','C','A')
+positive<- c('R','K','H')
+negative<- c('D','E')
+charged<- c('R','K','H','D','E')
+polar<- c('N','Q','C','S','H','Y','T','R','K','D','E')
+polar_neutral<- c('N','Q','C','S','Y','T')
+branched<-c('V','I','T')
+helix_break<- c('G','P')
+
+#Edit your scores csv to add a column defining what physicochemistry a variant belongs to 
+physicochemistry_means<-bind_rows(
+  {
+    eccd_scores %>%
+      filter(variants %in% hydrophobic)%>%
+      group_by(pos) %>%
+      summarize(ID='hydrophobic',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+    },
+  {
+    eccd_scores %>%
+      filter(variants %in% aliphatic)%>%
+      group_by(pos) %>%
+      summarize(ID='aliphatic',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_scores %>%
+      filter(variants %in% aromatic)%>%
+      group_by(pos) %>%
+      summarize(ID='aromatic',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_scores %>%
+      filter(variants %in% small)%>%
+      group_by(pos) %>%
+      summarize(ID='small',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_scores %>%
+      filter(variants %in% tiny)%>%
+      group_by(pos) %>%
+      summarize(ID='tiny',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_scores %>%
+      filter(variants %in% positive)%>%
+      group_by(pos) %>%
+      summarize(ID='positive',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_scores %>%
+      filter(variants %in% negative)%>%
+      group_by(pos) %>%
+      summarize(ID='negative',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_scores %>%
+      filter(variants %in% charged)%>%
+      group_by(pos) %>%
+      summarize(ID='charged',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_scores %>%
+      filter(variants %in% polar)%>%
+      group_by(pos) %>%
+      summarize(ID='polar',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_scores %>%
+      filter(variants %in% polar_neutral)%>%
+      group_by(pos) %>%
+      summarize(ID='polar_neutral',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_scores %>%
+      filter(variants %in% branched)%>%
+      group_by(pos) %>%
+      summarize(ID='branched',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_scores %>%
+      filter(variants %in% helix_break)%>%
+      group_by(pos) %>%
+      summarize(ID='helix_break',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+)
+
+write.csv(physicochemistry_means, "/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/physicochemistry_means.csv", row.names = FALSE)
+
+hydrophobic_data <- physicochemistry_means %>%
+  filter(ID == "hydrophobic")
+aromatic_data <- physicochemistry_means %>%
+  filter(ID == "aromatic")
+aliphatic_data <- physicochemistry_means %>%
+  filter(ID == "aliphatic")
+small_data <- physicochemistry_means %>%
+  filter(ID == "small")
+tiny_data <- physicochemistry_means %>%
+  filter(ID == "tiny")
+positive_data <- physicochemistry_means %>%
+  filter(ID == "positive")
+negative_data <- physicochemistry_means %>%
+  filter(ID == "negative")
+charged_data <- physicochemistry_means %>%
+  filter(ID == "charged")
+polar_data <- physicochemistry_means %>%
+  filter(ID == "polar")
+polar_neutral_data <- physicochemistry_means %>%
+  filter(ID == "polar_neutral")
+branched_data <- physicochemistry_means %>%
+  filter(ID == "branched")
+helix_break_data <- physicochemistry_means %>%
+  filter(ID == "helix_break")
+
+x = map_scores_pdb(DMS_6umm, hydrophobic_data, "CS_score")
+write.pdb(x, file="output/structures/6umm_CS_hydrophobic.pdb")
+x = map_scores_pdb(DMS_6umm, aromatic_data, "CS_score")
+write.pdb(x, file="output/structures/6umm_CS_aromatic.pdb")
+x = map_scores_pdb(DMS_6umm, aliphatic_data, "CS_score")
+write.pdb(x, file="output/structures/6umm_CS_aliphatic.pdb")
+x = map_scores_pdb(DMS_6umm, small_data, "CS_score")
+write.pdb(x, file="output/structures/6umm_CS_small.pdb")
+x = map_scores_pdb(DMS_6umm, tiny_data, "CS_score")
+write.pdb(x, file="output/structures/6umm_CS_tiny.pdb")
+x = map_scores_pdb(DMS_6umm, positive_data, "CS_score")
+write.pdb(x, file="output/structures/6umm_CS_positive.pdb")
+x = map_scores_pdb(DMS_6umm, negative_data, "CS_score")
+write.pdb(x, file="output/structures/6umm_CS_negative.pdb")
+x = map_scores_pdb(DMS_6umm, charged_data, "CS_score")
+write.pdb(x, file="output/structures/6umm_CS_charged.pdb")
+x = map_scores_pdb(DMS_6umm, polar_data, "CS_score")
+write.pdb(x, file="output/structures/6umm_CS_polar.pdb")
+x = map_scores_pdb(DMS_6umm, polar_neutral_data, "CS_score")
+write.pdb(x, file="output/structures/6umm_CS_polar_neutral.pdb")
+x = map_scores_pdb(DMS_6umm, branched_data, "CS_score")
+write.pdb(x, file="output/structures/6umm_CS_branched.pdb")
+x = map_scores_pdb(DMS_6umm, helix_break_data, "CS_score")
+write.pdb(x, file="output/structures/6umm_CS_helixbreak.pdb")
+
+x = map_scores_pdb(DMS_6umm, hydrophobic_data, "Fe_score")
+write.pdb(x, file="output/structures/6umm_Fe_hydrophobic.pdb")
+x = map_scores_pdb(DMS_6umm, aromatic_data, "Fe_score")
+write.pdb(x, file="output/structures/6umm_Fe_aromatic.pdb")
+x = map_scores_pdb(DMS_6umm, aliphatic_data, "Fe_score")
+write.pdb(x, file="output/structures/6umm_Fe_aliphatic.pdb")
+x = map_scores_pdb(DMS_6umm, small_data, "Fe_score")
+write.pdb(x, file="output/structures/6umm_Fe_small.pdb")
+x = map_scores_pdb(DMS_6umm, tiny_data, "Fe_score")
+write.pdb(x, file="output/structures/6umm_Fe_tiny.pdb")
+x = map_scores_pdb(DMS_6umm, positive_data, "Fe_score")
+write.pdb(x, file="output/structures/6umm_Fe_positive.pdb")
+x = map_scores_pdb(DMS_6umm, negative_data, "Fe_score")
+write.pdb(x, file="output/structures/6umm_Fe_negative.pdb")
+x = map_scores_pdb(DMS_6umm, charged_data, "Fe_score")
+write.pdb(x, file="output/structures/6umm_Fe_charged.pdb")
+x = map_scores_pdb(DMS_6umm, polar_data, "Fe_score")
+write.pdb(x, file="output/structures/6umm_Fe_polar.pdb")
+x = map_scores_pdb(DMS_6umm, polar_neutral_data, "Fe_score")
+write.pdb(x, file="output/structures/6umm_Fe_polar_neutral.pdb")
+x = map_scores_pdb(DMS_6umm, branched_data, "Fe_score")
+write.pdb(x, file="output/structures/6umm_Fe_branched.pdb")
+x = map_scores_pdb(DMS_6umm, helix_break_data, "Fe_score")
+write.pdb(x, file="output/structures/6umm_Fe_helixbreak.pdb")
+
+x = map_scores_pdb(eccD3_protomer, hydrophobic_data, "CS_score")
+write.pdb(x, file="output/structures/eccD3_CS_hydrophobic.pdb")
+x = map_scores_pdb(eccD3_protomer, aromatic_data, "CS_score")
+write.pdb(x, file="output/structures/eccD3_CS_aromatic.pdb")
+x = map_scores_pdb(eccD3_protomer, aliphatic_data, "CS_score")
+write.pdb(x, file="output/structures/eccD3_CS_aliphatic.pdb")
+x = map_scores_pdb(eccD3_protomer, small_data, "CS_score")
+write.pdb(x, file="output/structures/eccD3_CS_small.pdb")
+x = map_scores_pdb(eccD3_protomer, tiny_data, "CS_score")
+write.pdb(x, file="output/structures/eccD3_CS_tiny.pdb")
+x = map_scores_pdb(eccD3_protomer, positive_data, "CS_score")
+write.pdb(x, file="output/structures/eccD3_CS_positive.pdb")
+x = map_scores_pdb(eccD3_protomer, negative_data, "CS_score")
+write.pdb(x, file="output/structures/eccD3_CS_negative.pdb")
+x = map_scores_pdb(eccD3_protomer, charged_data, "CS_score")
+write.pdb(x, file="output/structures/eccD3_CS_charged.pdb")
+x = map_scores_pdb(eccD3_protomer, polar_data, "CS_score")
+write.pdb(x, file="output/structures/eccD3_CS_polar.pdb")
+x = map_scores_pdb(eccD3_protomer, polar_neutral_data, "CS_score")
+write.pdb(x, file="output/structures/eccD3_CS_polar_neutral.pdb")
+x = map_scores_pdb(eccD3_protomer, branched_data, "CS_score")
+write.pdb(x, file="output/structures/eccD3_CS_branched.pdb")
+x = map_scores_pdb(eccD3_protomer, helix_break_data, "CS_score")
+write.pdb(x, file="output/structures/eccD3_CS_helixbreak.pdb")
+
+x = map_scores_pdb(eccD3_protomer, hydrophobic_data, "Fe_score")
+write.pdb(x, file="output/structures/eccD3_Fe_hydrophobic.pdb")
+x = map_scores_pdb(eccD3_protomer, aromatic_data, "Fe_score")
+write.pdb(x, file="output/structures/eccD3_Fe_aromatic.pdb")
+x = map_scores_pdb(eccD3_protomer, aliphatic_data, "Fe_score")
+write.pdb(x, file="output/structures/eccD3_Fe_aliphatic.pdb")
+x = map_scores_pdb(eccD3_protomer, small_data, "Fe_score")
+write.pdb(x, file="output/structures/eccD3_Fe_small.pdb")
+x = map_scores_pdb(eccD3_protomer, tiny_data, "Fe_score")
+write.pdb(x, file="output/structures/eccD3_Fe_tiny.pdb")
+x = map_scores_pdb(eccD3_protomer, positive_data, "Fe_score")
+write.pdb(x, file="output/structures/eccD3_Fe_positive.pdb")
+x = map_scores_pdb(eccD3_protomer, negative_data, "Fe_score")
+write.pdb(x, file="output/structures/eccD3_Fe_negative.pdb")
+x = map_scores_pdb(eccD3_protomer, charged_data, "Fe_score")
+write.pdb(x, file="output/structures/eccD3_Fe_charged.pdb")
+x = map_scores_pdb(eccD3_protomer, polar_data, "Fe_score")
+write.pdb(x, file="output/structures/eccD3_Fe_polar.pdb")
+x = map_scores_pdb(eccD3_protomer, polar_neutral_data, "Fe_score")
+write.pdb(x, file="output/structures/eccD3_Fe_polar_neutral.pdb")
+x = map_scores_pdb(eccD3_protomer, branched_data, "Fe_score")
+write.pdb(x, file="output/structures/eccD3_Fe_branched.pdb")
+x = map_scores_pdb(eccD3_protomer, helix_break_data, "Fe_score")
+write.pdb(x, file="output/structures/eccD3_Fe_helixbreak.pdb")
+
+
+#Ubl hydro
+#Define physicochemistries
+
+#Edit your scores csv to add a column defining what physicochemistry a variant belongs to 
+Ubl_interface_physicochemistry_means<-bind_rows(
+  {
+    eccd_Ubl_interface_scores_renumber %>%
+      filter(variants %in% hydrophobic)%>%
+      group_by(pos) %>%
+      summarize(variants='hydrophobic',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+    },
+  {
+    eccd_Ubl_interface_scores_renumber %>%
+      filter(variants %in% aliphatic)%>%
+      group_by(pos) %>%
+      summarize(variants='aliphatic',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_Ubl_interface_scores_renumber %>%
+      filter(variants %in% aromatic)%>%
+      group_by(pos) %>%
+      summarize(variants='aromatic',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_Ubl_interface_scores_renumber %>%
+      filter(variants %in% small)%>%
+      group_by(pos) %>%
+      summarize(variants='small',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_Ubl_interface_scores_renumber %>%
+      filter(variants %in% tiny)%>%
+      group_by(pos) %>%
+      summarize(variants='tiny',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_Ubl_interface_scores_renumber %>%
+      filter(variants %in% positive)%>%
+      group_by(pos) %>%
+      summarize(variants='positive',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_Ubl_interface_scores_renumber %>%
+      filter(variants %in% negative)%>%
+      group_by(pos) %>%
+      summarize(variants='negative',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_Ubl_interface_scores_renumber %>%
+      filter(variants %in% charged)%>%
+      group_by(pos) %>%
+      summarize(variants='charged',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_Ubl_interface_scores_renumber %>%
+      filter(variants %in% polar)%>%
+      group_by(pos) %>%
+      summarize(variants='polar',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_Ubl_interface_scores_renumber %>%
+      filter(variants %in% polar_neutral)%>%
+      group_by(pos) %>%
+      summarize(variants='polar_neutral',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_Ubl_interface_scores_renumber %>%
+      filter(variants %in% branched)%>%
+      group_by(pos) %>%
+      summarize(variants='branched',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+  {
+    eccd_Ubl_interface_scores_renumber %>%
+      filter(variants %in% helix_break)%>%
+      group_by(pos) %>%
+      summarize(variants='helix_break',CS_score=mean(CS_score),Fe_score=mean(Fe_score))
+  },
+)
+
+write.csv(Ubl_interface_physicochemistry_means, "/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/ubl_interface_physicochemistry_means.csv", row.names = FALSE)
+
+```
+
+#Physicochemistry for missense scores, only
+```{r}
+order <- c('aromatic','aliphatic', 'hydrophobic','branched', 'small',
+          'polar','charged','negative','positive')
+hydrophobic<- c('I','L','V','M','C','A','T','H','K','W','Y','F')
+aromatic<- c('W','F','Y','H')
+aliphatic<- c('V','A','L','I')
+small<- c('C','V','A','C','T','S','G')
+positive<- c('R','K','H')
+negative<- c('D','E')
+charged<- c('R','K','H','D','E')
+polar<- c('N','Q','C','S','H','Y','T','R','K','D','E')
+helix_break<- c('G','P')
+physicochemistry_less_missense_means<-bind_rows(
+  {
+    avg_missense_scores %>%
+      group_by(pos) %>%
+      summarize(variants='average',CS_score=avg_CS,Fe_score=avg_Fe)
+    },
+  {
+    eccd_scores_missense %>%
+      filter(variants %in% hydrophobic)%>%
+      group_by(pos) %>%
+      summarize(variants='hydrophobic',CS_score = mean(CS_score, na.rm=TRUE),Fe_score = mean(Fe_score, na.rm=TRUE))
+    },
+  {
+    eccd_scores_missense %>%
+      filter(variants %in% aliphatic)%>%
+      group_by(pos) %>%
+      summarize(variants='aliphatic',CS_score = mean(CS_score, na.rm=TRUE), Fe_score = mean(Fe_score, na.rm=TRUE))
+  },
+  {
+    eccd_scores_missense %>%
+      filter(variants %in% aromatic)%>%
+      group_by(pos) %>%
+      summarize(variants='aromatic',CS_score = mean(CS_score, na.rm=TRUE), Fe_score = mean(Fe_score, na.rm=TRUE))
+  },
+  {
+    eccd_scores_missense %>%
+      filter(variants %in% small)%>%
+      group_by(pos) %>%
+      summarize(variants='small',CS_score = mean(CS_score, na.rm=TRUE), Fe_score = mean(Fe_score, na.rm=TRUE))
+  },
+  {
+    eccd_scores_missense %>%
+      filter(variants %in% positive)%>%
+      group_by(pos) %>%
+      summarize(variants='positive',CS_score = mean(CS_score, na.rm=TRUE), Fe_score = mean(Fe_score, na.rm=TRUE))
+  },
+  {
+    eccd_scores_missense %>%
+      filter(variants %in% negative)%>%
+      group_by(pos) %>%
+      summarize(variants='negative',CS_score = mean(CS_score, na.rm=TRUE), Fe_score = mean(Fe_score, na.rm=TRUE))
+  },
+  {
+    eccd_scores_missense %>%
+      filter(variants %in% charged)%>%
+      group_by(pos) %>%
+      summarize(variants='charged',CS_score = mean(CS_score, na.rm=TRUE), Fe_score = mean(Fe_score, na.rm=TRUE))
+  },
+  {
+    eccd_scores_missense %>%
+      filter(variants %in% polar)%>%
+      group_by(pos) %>%
+      summarize(variants='polar',CS_score = mean(CS_score, na.rm=TRUE), Fe_score = mean(Fe_score, na.rm=TRUE))
+  },
+)
+
+write.csv(physicochemistry_less_missense_means, "/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/phys_less_missense_means.csv", row.names = FALSE)
+
+avg_data <- physicochemistry_missense_means %>%
+  filter(ID == "average")
+hydrophobic_data <- physicochemistry_missense_means %>%
+  filter(ID == "hydrophobic")
+aromatic_data <- physicochemistry_missense_means %>%
+  filter(ID == "aromatic")
+aliphatic_data <- physicochemistry_missense_means %>%
+  filter(ID == "aliphatic")
+small_data <- physicochemistry_missense_means %>%
+  filter(ID == "small")
+tiny_data <- physicochemistry_missense_means %>%
+  filter(ID == "tiny")
+positive_data <- physicochemistry_missense_means %>%
+  filter(ID == "positive")
+negative_data <- physicochemistry_missense_means %>%
+  filter(ID == "negative")
+charged_data <- physicochemistry_missense_means %>%
+  filter(ID == "charged")
+polar_data <- physicochemistry_missense_means %>%
+  filter(ID == "polar")
+polar_neutral_data <- physicochemistry_missense_means %>%
+  filter(ID == "polar_neutral")
+branched_data <- physicochemistry_missense_means %>%
+  filter(ID == "branched")
+helix_break_data <- physicochemistry_missense_means %>%
+  filter(ID == "helix_break")
+
+#Make a dataframe to plot heatmaps for physicohemistry
+average <- c('A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y')
+hydrophobic<- c('I','L','V','M','C','A','T','H','K','W','Y','F')
+aromatic<- c('W','F','Y','H')
+aliphatic<- c('V','A','L','I')
+polar<- c('N','Q','C','S','H','Y','T','R','K','D','E')
+charged<- c('R','K','H','D','E')
+positive<- c('R','K','H')
+negative<- c('D','E')
+small<- c('C','V','A','C','T','S','G')
+tiny<- c('G','S','C','A')
+
+#Don't include ALL physicochemistries
+some_physicochemistry_missense_means<-bind_rows(
+  {
+    avg_missense_scores %>%
+      group_by(pos) %>%
+      summarize(variants='average',CS_score=avg_CS,Fe_score=avg_Fe)
+    },
+  {
+    eccd_scores_missense %>%
+      filter(variants %in% hydrophobic)%>%
+      group_by(pos) %>%
+      summarize(variants='hydrophobic',CS_score = mean(CS_score, na.rm=TRUE),Fe_score = mean(Fe_score, na.rm=TRUE))
+    },
+  {
+    eccd_scores_missense %>%
+      filter(variants %in% aliphatic)%>%
+      group_by(pos) %>%
+      summarize(variants='aliphatic',CS_score = mean(CS_score, na.rm=TRUE), Fe_score = mean(Fe_score, na.rm=TRUE))
+  },
+  {
+    eccd_scores_missense %>%
+      filter(variants %in% aromatic)%>%
+      group_by(pos) %>%
+      summarize(variants='aromatic',CS_score = mean(CS_score, na.rm=TRUE), Fe_score = mean(Fe_score, na.rm=TRUE))
+  },
+  {
+    eccd_scores_missense %>%
+      filter(variants %in% small)%>%
+      group_by(pos) %>%
+      summarize(variants='small',CS_score = mean(CS_score, na.rm=TRUE), Fe_score = mean(Fe_score, na.rm=TRUE))
+  },
+  {
+    eccd_scores_missense %>%
+      filter(variants %in% tiny)%>%
+      group_by(pos) %>%
+      summarize(variants='tiny',CS_score = mean(CS_score, na.rm=TRUE), Fe_score = mean(Fe_score, na.rm=TRUE))
+  },
+  {
+    eccd_scores_missense %>%
+      filter(variants %in% positive)%>%
+      group_by(pos) %>%
+      summarize(variants='positive',CS_score = mean(CS_score, na.rm=TRUE), Fe_score = mean(Fe_score, na.rm=TRUE))
+  },
+  {
+    eccd_scores_missense %>%
+      filter(variants %in% negative)%>%
+      group_by(pos) %>%
+      summarize(variants='negative',CS_score = mean(CS_score, na.rm=TRUE), Fe_score = mean(Fe_score, na.rm=TRUE))
+  },
+  {
+    eccd_scores_missense %>%
+      filter(variants %in% charged)%>%
+      group_by(pos) %>%
+      summarize(variants='charged',CS_score = mean(CS_score, na.rm=TRUE), Fe_score = mean(Fe_score, na.rm=TRUE))
+  },
+  {
+    eccd_scores_missense %>%
+      filter(variants %in% polar)%>%
+      group_by(pos) %>%
+      summarize(variants='polar',CS_score = mean(CS_score, na.rm=TRUE), Fe_score = mean(Fe_score, na.rm=TRUE))
+  },
+)
+
+write.csv(some_physicochemistry_missense_means, "/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/some_phys_missense_means.csv", row.names = FALSE)
+
+x = map_scores_pdb(eccD3_protomer, avg_missense_scores, "avg_CS")
+write.pdb(x, file="output/structures/eccD3_CS_avgmissense.pdb")
+x = map_scores_pdb(eccD3_protomer, avg_missense_scores, "avg_Fe")
+write.pdb(x, file="output/structures/eccD3_FeS_avgmissense.pdb")
+
+```
+
+#Physicochem violin plot
+```{r}
+#Makes violin plot for all physicohemistries listed earlier
+violinphyisoCS <- ggplot(physicochemistry_means, aes(x = ID, y = CS_score, fill = ID)) +
+  geom_violin() +
+  scale_fill_manual(values = rainbow(length(unique(physicochemistry_means$ID)))) +
+  theme_minimal() +
+  labs(title = "CS Scores by Physicochemistry",
+       x = "Physicochemistry",
+       y = "CS Score")
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/violinCSphysico.png", plot = violinphyisoCS, width = 9, height = 6, dpi = 300)
+
+violinphyisoFe <- ggplot(physicochemistry_means, aes(x = ID, y = Fe_score, fill = ID)) +
+  geom_violin() +
+  scale_fill_manual(values = rainbow(length(unique(physicochemistry_means$ID)))) +
+  theme_minimal() +
+  labs(title = "Fe Scores by Physicochemistry",
+       x = "Physicochemistry",
+       y = "Fe Score")
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/violinFephysico.png", plot = violinphyisoFe, width = 9, height = 6, dpi = 300)
+
+
+absviolinphyiso <- ggplot(physicochemistry_means, aes(x = ID, y = abs(CS_score), fill = ID)) +
+  geom_violin() +
+  scale_fill_manual(values = rainbow(length(unique(physicochemistry_means$ID)))) +
+  theme_minimal() +
+  labs(title = "Absolute CS Scores by Physicochemistry",
+       x = "Physicochemistry",
+       y = "Absolute CS Score")
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/absviolinCSphysico.png", plot = absviolinphyiso, width = 9, height = 6, dpi = 300)
+
+#Compare a few groups
+ggplot(physicochemistry_means, aes(x = ID, y = CS_score, fill = ID)) +
+  geom_violin() +
+  scale_fill_manual(values = c("aliphatic" = "blue", "aromatic" = "red")) +
+  theme_minimal() +
+  labs(title = "CS mean scores by physicochemistry",
+       x = "Type",
+       y = "CS_score")
+
+
+```
+
+#Replot the OG growth curves
+```{r}
+colors <- c("WT" = "darkgreen", "Δesx-3" = "red", "Δfxba/eccD" = "orange", "::D" = "purple")
+
+#Error bars
+OG_CS <- data.frame(
+  Hours = c(0, 24, 48, 72),
+  WT_1 = c(0.001, 0.083, 0.76, 0.75),
+  WT_2 = c(0.001, 0.158, 0.6, 0.69),
+  WT_3 = c(0.001, 0.064, 0.62, 0.75),
+  fxba_eccD_1 = c(0.001, 0.009, 0.04, 0.18),
+  fxba_eccD_2 = c(0.001, 0.01, 0.04, 0.08),
+  fxba_eccD_3 = c(0.001, 0.01, 0.02, 0.02),
+  complement_1 = c(0.001, 0.017, 0.28, 0.76),
+  complement_2 = c(0.001, 0.02, 0.34, 0.77),
+  complement_3 = c(0.001, 0.02, 0.32, 0.52),
+  esx_3_1 = c(0.001, 0.01, 0.03, 0.1),
+  esx_3_2 = c(0.001, 0.008, 0.02, 0.02),
+  esx_3_3 = c(0.001, 0.01, 0.06, 0.49)
+)
+
+OG_FeS <- data.frame(
+  Hours = c(0, 24, 48, 72),
+  WT_1 = c(0.001, 0.161, 1.11, 1.06),
+  WT_2 = c(0.001, 0.153, 1.03, 1.01),
+  WT_3 = c(0.001, 0.16, 2.23, 2.27),
+  fxba_eccD_1 = c(0.001, 0.043, 1, 1.05),
+  fxba_eccD_2 = c(0.001, 0.049, 0.76, 1),
+  fxba_eccD_3 = c(0.001, 0.03, 0.8, 1.13),
+  complement_1 = c(0.001, 0.154, 0.88, 1.07),
+  complement_2 = c(0.001, 0.165, 0.9, 0.89),
+  complement_3 = c(0.001, 0.158, 0.8, 1.08),
+  esx_3_1 = c(0.001, 0.087, 1.94, 3.17),
+  esx_3_2 = c(0.001, 0.019, 1.29, 2.79),
+  esx_3_3 = c(0.001, 0.138, 1.06, 0.96)
+)
+
+OG_CS$mean_WT <- rowMeans(OG_CS[2:4], na.rm = TRUE)
+OG_CS$sd_WT <- apply(OG_CS[2:4], 1, sd, na.rm = TRUE)
+OG_CS$sem_WT <- OG_CS$sd_WT / sqrt(3)
+
+OG_CS$mean_fxba_eccD <- rowMeans(OG_CS[5:7], na.rm = TRUE)
+OG_CS$sd_fxba_eccD <- apply(OG_CS[5:7], 1, sd, na.rm = TRUE)
+OG_CS$sem_fxba_eccD <- OG_CS$sd_fxba_eccD / sqrt(3)
+
+OG_CS$mean_complement <- rowMeans(OG_CS[8:10], na.rm = TRUE)
+OG_CS$sd_complement <- apply(OG_CS[8:10], 1, sd, na.rm = TRUE)
+OG_CS$sem_complement <- OG_CS$sd_complement / sqrt(3)
+
+OG_CS$mean_esx_3 <- rowMeans(OG_CS[11:13], na.rm = TRUE)
+OG_CS$sd_esx_3 <- apply(OG_CS[11:13], 1, sd, na.rm = TRUE)
+OG_CS$sem_esx_3 <- OG_CS$sd_esx_3 / sqrt(3)
+
+OG_CS_plot <- ggplot(OG_CS, aes(x = Hours)) +
+  geom_point(aes(y = mean_WT, color = "WT"), size = 3) +
+  geom_point(aes(y = mean_fxba_eccD, color = "fxba_eccD"), size = 3) +
+  geom_point(aes(y = mean_complement, color = "complement"), size = 3) +
+  geom_point(aes(y = mean_esx_3, color = "esx_3"), size = 3) +
+  geom_line(aes(y = mean_WT, color = "WT"), size = 1.5) +
+  geom_line(aes(y = mean_fxba_eccD, color = "fxba_eccD"), size = 1.5) +
+  geom_line(aes(y = mean_complement, color = "complement"), size = 1.5) +
+  geom_line(aes(y = mean_esx_3, color = "esx_3"), size = 1.5) +
+  geom_errorbar(aes(ymin = mean_WT - sem_WT, ymax = mean_WT + sem_WT, color = "WT"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_fxba_eccD - sem_fxba_eccD, ymax = mean_fxba_eccD + sem_fxba_eccD, color = "fxba_eccD"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_complement - sem_complement, ymax = mean_complement + sem_complement, color = "complement"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_esx_3 - sem_esx_3, ymax = mean_esx_3 + sem_esx_3, color = "esx_3"), width = 2.5) +
+  labs(title = "Iron Deficient Growth Curve", x = "Hours", y = "OD 600") +
+  scale_x_continuous(breaks = c(0, 24, 48, 72)) +
+  theme_classic() +
+  scale_y_log10(limits = c(0.001, 1), breaks = c(0.001, 0.01, 0.1, 1), labels = CS_break_labels) +
+  Lib_gc_options +
+  scale_color_manual(
+    values = c(
+      "complement" = "#44AA99",
+      "esx_3" = "#88CCEE",
+      "WT" = "#332288",
+      "fxba_eccD" = "#882255"
+    ),
+    name = "Strains"
+  )
+
+OG_CS_plot
+
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/Fig1/OG_CS_plot.png", plot = OG_CS_plot, width = 8, height = 6, dpi = 600)
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/Fig1/OG_CS_plot.pdf", plot = OG_CS_plot, width = 8, height = 6, dpi = 600)
+
+OG_FeS$mean_WT <- rowMeans(OG_FeS[2:4], na.rm = TRUE)
+OG_FeS$sd_WT <- apply(OG_FeS[2:4], 1, sd, na.rm = TRUE)
+OG_FeS$sem_WT <- OG_FeS$sd_WT / sqrt(3)
+
+OG_FeS$mean_fxba_eccD <- rowMeans(OG_FeS[5:7], na.rm = TRUE)
+OG_FeS$sd_fxba_eccD <- apply(OG_FeS[5:7], 1, sd, na.rm = TRUE)
+OG_FeS$sem_fxba_eccD <- OG_FeS$sd_fxba_eccD / sqrt(3)
+
+OG_FeS$mean_complement <- rowMeans(OG_FeS[8:10], na.rm = TRUE)
+OG_FeS$sd_complement <- apply(OG_FeS[8:10], 1, sd, na.rm = TRUE)
+OG_FeS$sem_complement <- OG_FeS$sd_complement / sqrt(3)
+
+OG_FeS$mean_esx_3 <- rowMeans(OG_FeS[11:13], na.rm = TRUE)
+OG_FeS$sd_esx_3 <- apply(OG_FeS[11:13], 1, sd, na.rm = TRUE)
+OG_FeS$sem_esx_3 <- OG_FeS$sd_esx_3 / sqrt(3)
+
+OG_FeS_plot <- ggplot(OG_FeS, aes(x = Hours)) +
+  geom_point(aes(y = mean_WT, color = "WT"), size = 3) +
+  geom_point(aes(y = mean_fxba_eccD, color = "fxba_eccD"), size = 3) +
+  geom_point(aes(y = mean_complement, color = "complement"), size = 3) +
+  geom_point(aes(y = mean_esx_3, color = "esx_3"), size = 3) +
+  geom_line(aes(y = mean_WT, color = "WT"), size = 1.5) +
+  geom_line(aes(y = mean_fxba_eccD, color = "fxba_eccD"), size = 1.5) +
+  geom_line(aes(y = mean_complement, color = "complement"), size = 1.5) +
+  geom_line(aes(y = mean_esx_3, color = "esx_3"), size = 1.5) +
+  geom_errorbar(aes(ymin = mean_WT - sem_WT, ymax = mean_WT + sem_WT, color = "WT"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_fxba_eccD - sem_fxba_eccD, ymax = mean_fxba_eccD + sem_fxba_eccD, color = "fxba_eccD"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_complement - sem_complement, ymax = mean_complement + sem_complement, color = "complement"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_esx_3 - sem_esx_3, ymax = mean_esx_3 + sem_esx_3, color = "esx_3"), width = 2.5) +
+  labs(title = "Iron Sufficient Growth Curve", x = "Hours", y = "OD 600") +
+  theme_classic() +
+  scale_x_continuous(breaks = c(0, 24, 48, 72)) +
+  scale_y_log10(limits = c(0.001, 10), breaks = c(0.001, 0.01, 0.1, 1, 10), labels = FeS_break_labels) +
+  Lib_gc_options +
+  scale_color_manual(
+    values = c(
+      "WT" = "#332288",
+      "esx_3" = "#88CCEE",
+      "fxba_eccD" = "#882255",
+      "complement" = "#44AA99"
+    ),
+    name = "Strains"
+  )
+
+OG_FeS_plot
+
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/Fig1/OG_FeS_plot.png", plot = OG_FeS_plot, width = 8, height = 6, dpi = 600)
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/Fig1/OG_FeS_plot.pdf", plot = OG_FeS_plot, width = 8, height = 6, dpi = 600)
+
+#SDMs
+SDM_CS_2 <- data.frame(
+  Hours = c(0, 12, 20, 36, 44, 60),
+  WT_1 = c(0.001, 0.003, 0.005, 0.026, 0.042, 0.131),
+  WT_2 = c(0.001, 0.003, 0.005, 0.025, 0.048, 0.136),
+  I72D_1 = c(0.001, 0.003, 0.004, 0.009, 0.006, 0.02),
+  I72D_2 = c(0.001, 0.004, 0.006, 0.017, 0.027, 0.102),
+  D90R_1 = c(0.001, 0.003, 0.003, 0.01, 0.007, 0.029),
+  D90R_2 = c(0.001, 0.005, 0.006, 0.014, 0.02, 0.091),
+  L96W_1 = c(0.001, 0.004, 0.005, 0.014, 0.016, 0.073),
+  L96W_2 = c(0.001, 0.002, 0.002, 0.013, 0.022, 0.087),
+  E110R_1 = c(0.001, 0.003, 0.003, 0.006, 0.006, 0.006),
+  E110R_2 = c(0.001, 0.002, 0.003, 0.006, 0.006, 0.006),
+  R134A_1 = c(0.001, 0.005, 0.004, 0.023, 0.037, 0.174),
+  R134A_2 = c(0.001, 0.005, 0.005, 0.025, 0.047, 0.132),
+  F212D_1 = c(0.001, 0.002, 0.002, 0.013, 0.014, 0.089),
+  F212D_2 = c(0.001, 0.003, 0.004, 0.018, 0.033, 0.12),
+  Double_1 = c(0.001, 0.002, 0.003, 0.007, 0.005, 0.005),
+  Double_2 = c(0.001, 0.002, 0.003, 0.006, 0.006, 0.006)
+)
+
+SDM_Fe_2 <- data.frame(
+  Hours = c(0, 12, 20, 36, 44, 60),
+  WT_1 = c(0.001, 0.011, 0.042, 0.375, 0.494, 0.562),
+  WT_2 = c(0.001, 0.018, 0.061, 0.573, 0.842, 1.22),
+  I72D_1 = c(0.001, 0.021, 0.072, 0.36, 0.36, 0.335),
+  I72D_2 = c(0.001, 0.014, 0.042, 0.445, 0.666, 0.82),
+  D90R_1 = c(0.001, 0.008, 0.031, 0.284, 0.367, 0.36),
+  D90R_2 = c(0.001, 0.015, 0.053, 0.441, 0.632, 0.73),
+  L96W_1 = c(0.001, 0.011, 0.041, 0.33, 0.36, 0.352),
+  L96W_2 = c(0.001, 0.015, 0.054, 0.423, 0.556, 0.61),
+  E110R_1 = c(0.001, 0.007, 0.024, 0.222, 0.28, 0.31),
+  E110R_2 = c(0.001, 0.009, 0.03, 0.331, 0.54, 0.72),
+  R134A_1 = c(0.001, 0.008, 0.035, 0.312, 0.38, 0.435),
+  R134A_2 = c(0.001, 0.02, 0.073, 0.412, 0.482, 0.5),
+  F212D_1 = c(0.001, 0.009, 0.046, 0.325, 0.375, 0.391),
+  F212D_2 = c(0.001, 0.014, 0.051, 0.399, 0.514, 0.53),
+  Double_1 = c(0.001, 0.006, 0.017, 0.252, 0.534, 0.959),
+  Double_2 = c(0.001, 0.006, 0.02, 0.245, 0.446, 0.58)
+)
+
+SDM_CS_2$mean_WT <- rowMeans(SDM_CS_2[2:3], na.rm = TRUE)
+SDM_CS_2$sd_WT <- apply(SDM_CS_2[2:3], 1, sd, na.rm = TRUE)
+SDM_CS_2$sem_WT <- SDM_CS_2$sd_WT / sqrt(2)
+
+SDM_CS_2$mean_I72D <- rowMeans(SDM_CS_2[4:5], na.rm = TRUE)
+SDM_CS_2$sd_I72D <- apply(SDM_CS_2[4:5], 1, sd, na.rm = TRUE)
+SDM_CS_2$sem_I72D <- SDM_CS_2$sd_I72D / sqrt(2)
+
+SDM_CS_2$mean_D90R <- rowMeans(SDM_CS_2[6:7], na.rm = TRUE)
+SDM_CS_2$sd_D90R <- apply(SDM_CS_2[6:7], 1, sd, na.rm = TRUE)
+SDM_CS_2$sem_D90R <- SDM_CS_2$sd_WT / sqrt(2)
+
+SDM_CS_2$mean_L96W <- rowMeans(SDM_CS_2[8:9], na.rm = TRUE)
+SDM_CS_2$sd_L96W <- apply(SDM_CS_2[8:9], 1, sd, na.rm = TRUE)
+SDM_CS_2$sem_L96W <- SDM_CS_2$sd_WT / sqrt(2)
+
+SDM_CS_2$mean_E110R <- rowMeans(SDM_CS_2[10:11], na.rm = TRUE)
+SDM_CS_2$sd_E110R <- apply(SDM_CS_2[10:11], 1, sd, na.rm = TRUE)
+SDM_CS_2$sem_E110R <- SDM_CS_2$sd_WT / sqrt(2)
+
+SDM_CS_2$mean_R134A <- rowMeans(SDM_CS_2[12:13], na.rm = TRUE)
+SDM_CS_2$sd_R134A <- apply(SDM_CS_2[12:13], 1, sd, na.rm = TRUE)
+SDM_CS_2$sem_R134A <- SDM_CS_2$sd_WT / sqrt(2)
+
+SDM_CS_2$mean_F212D <- rowMeans(SDM_CS_2[14:15], na.rm = TRUE)
+SDM_CS_2$sd_F212D <- apply(SDM_CS_2[14:15], 1, sd, na.rm = TRUE)
+SDM_CS_2$sem_F212D <- SDM_CS_2$sd_WT / sqrt(2)
+
+SDM_CS_2$mean_Double <- rowMeans(SDM_CS_2[16:17], na.rm = TRUE)
+SDM_CS_2$sd_Double <- apply(SDM_CS_2[16:17], 1, sd, na.rm = TRUE)
+SDM_CS_2$sem_Double <- SDM_CS_2$sd_WT / sqrt(2)
+
+#Fe
+SDM_Fe_2$mean_WT <- rowMeans(SDM_Fe_2[2:3], na.rm = TRUE)
+SDM_Fe_2$sd_WT <- apply(SDM_Fe_2[2:3], 1, sd, na.rm = TRUE)
+SDM_Fe_2$sem_WT <- SDM_Fe_2$sd_WT / sqrt(2)
+
+SDM_Fe_2$mean_I72D <- rowMeans(SDM_Fe_2[4:5], na.rm = TRUE)
+SDM_Fe_2$sd_I72D <- apply(SDM_Fe_2[4:5], 1, sd, na.rm = TRUE)
+SDM_Fe_2$sem_I72D <- SDM_Fe_2$sd_I72D / sqrt(2)
+
+SDM_Fe_2$mean_D90R <- rowMeans(SDM_Fe_2[6:7], na.rm = TRUE)
+SDM_Fe_2$sd_D90R <- apply(SDM_Fe_2[6:7], 1, sd, na.rm = TRUE)
+SDM_Fe_2$sem_D90R <- SDM_Fe_2$sd_WT / sqrt(2)
+
+SDM_Fe_2$mean_L96W <- rowMeans(SDM_Fe_2[8:9], na.rm = TRUE)
+SDM_Fe_2$sd_L96W <- apply(SDM_Fe_2[8:9], 1, sd, na.rm = TRUE)
+SDM_Fe_2$sem_L96W <- SDM_Fe_2$sd_WT / sqrt(2)
+
+SDM_Fe_2$mean_E110R <- rowMeans(SDM_Fe_2[10:11], na.rm = TRUE)
+SDM_Fe_2$sd_E110R <- apply(SDM_Fe_2[10:11], 1, sd, na.rm = TRUE)
+SDM_Fe_2$sem_E110R <- SDM_Fe_2$sd_WT / sqrt(2)
+
+SDM_Fe_2$mean_R134A <- rowMeans(SDM_Fe_2[12:13], na.rm = TRUE)
+SDM_Fe_2$sd_R134A <- apply(SDM_Fe_2[12:13], 1, sd, na.rm = TRUE)
+SDM_Fe_2$sem_R134A <- SDM_Fe_2$sd_WT / sqrt(2)
+
+SDM_Fe_2$mean_F212D <- rowMeans(SDM_Fe_2[14:15], na.rm = TRUE)
+SDM_Fe_2$sd_F212D <- apply(SDM_Fe_2[14:15], 1, sd, na.rm = TRUE)
+SDM_Fe_2$sem_F212D <- SDM_Fe_2$sd_WT / sqrt(2)
+
+SDM_Fe_2$mean_Double <- rowMeans(SDM_Fe_2[16:17], na.rm = TRUE)
+SDM_Fe_2$sd_Double <- apply(SDM_Fe_2[16:17], 1, sd, na.rm = TRUE)
+SDM_Fe_2$sem_Double <- SDM_Fe_2$sd_WT / sqrt(2)
+
+SDM_CS_2_plot <- ggplot(SDM_CS_2, aes(x = Hours)) +
+  geom_point(aes(y = mean_WT, color = "WT"), size = 3) +
+  geom_point(aes(y = mean_I72D, color = "I72D"), size = 3) +
+  geom_point(aes(y = mean_D90R, color = "D90R"), size = 3) +
+  geom_point(aes(y = mean_L96W, color = "L96W"), size = 3) +
+  geom_point(aes(y = mean_E110R, color = "E110R"), size = 3) +
+  geom_point(aes(y = mean_R134A, color = "R134A"), size = 3) +
+  geom_point(aes(y = mean_F212D, color = "F212D"), size = 3) +
+  geom_point(aes(y = mean_Double, color = "Double"), size = 3) +
+  geom_line(aes(y = mean_WT, color = "WT"), size = 1.5) +
+  geom_line(aes(y = mean_I72D, color = "I72D"), size = 1.5) +
+  geom_line(aes(y = mean_D90R, color = "D90R"), size = 1.5) +
+  geom_line(aes(y = mean_L96W, color = "L96W"), size = 1.5) +
+  geom_line(aes(y = mean_E110R, color = "E110R"), size = 1.5) +
+  geom_line(aes(y = mean_R134A, color = "R134A"), size = 1.5) +
+  geom_line(aes(y = mean_F212D, color = "F212D"), size = 1.5) +
+  geom_line(aes(y = mean_Double, color = "Double"), size = 1.5) +
+  geom_errorbar(aes(ymin = mean_WT - sem_WT, ymax = mean_WT + sem_WT, color = "WT"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_I72D - sem_I72D, ymax = mean_I72D + sem_I72D, color = "I72D"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_D90R - sem_D90R, ymax = mean_D90R + sem_D90R, color = "D90R"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_L96W - sem_L96W, ymax = mean_L96W + sem_L96W, color = "L96W"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_E110R - sem_E110R, ymax = mean_E110R + sem_E110R, color = "E110R"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_R134A - sem_R134A, ymax = mean_R134A + sem_R134A, color = "R134A"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_F212D - sem_F212D, ymax = mean_F212D + sem_F212D, color = "F212D"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_Double - sem_Double, ymax = mean_Double + sem_Double, color = "Double"), width = 2.5) +
+  labs(title = "Iron Deficient Growth Curve", x = "Hours", y = "OD 600") +
+  theme_classic() +
+  scale_x_continuous(breaks = c(0, 12, 24, 36, 48, 60)) +
+  scale_y_log10(limits = c(0.001, 1), breaks = c(0.001, 0.01, 0.1, 1), labels = CS_break_labels) +
+  Lib_gc_options +
+  scale_color_manual(
+    values = c(
+      "I72D" = "#117733",
+      "D90R" = "#AA4499",
+      "L96W" = "#DDCC77",
+      "E110R" = "#44AA99",
+      "R134A" = "#CC6677",
+      "F212D" = "#88CCEE",
+      "WT" = "#332288",
+      "Double" = "#882255"
+    ),
+    name = "Strains"
+  )
+
+SDM_Fe_2_plot <- ggplot(SDM_Fe_2, aes(x = Hours)) +
+  geom_point(aes(y = mean_WT, color = "WT"), size = 3) +
+  geom_point(aes(y = mean_I72D, color = "I72D"), size = 3) +
+  geom_point(aes(y = mean_D90R, color = "D90R"), size = 3) +
+  geom_point(aes(y = mean_L96W, color = "L96W"), size = 3) +
+  geom_point(aes(y = mean_E110R, color = "E110R"), size = 3) +
+  geom_point(aes(y = mean_R134A, color = "R134A"), size = 3) +
+  geom_point(aes(y = mean_F212D, color = "F212D"), size = 3) +
+  geom_point(aes(y = mean_Double, color = "Double"), size = 3) +
+  geom_line(aes(y = mean_WT, color = "WT"), size = 1.5) +
+  geom_line(aes(y = mean_I72D, color = "I72D"), size = 1.5) +
+  geom_line(aes(y = mean_D90R, color = "D90R"), size = 1.5) +
+  geom_line(aes(y = mean_L96W, color = "L96W"), size = 1.5) +
+  geom_line(aes(y = mean_E110R, color = "E110R"), size = 1.5) +
+  geom_line(aes(y = mean_R134A, color = "R134A"), size = 1.5) +
+  geom_line(aes(y = mean_F212D, color = "F212D"), size = 1.5) +
+  geom_line(aes(y = mean_Double, color = "Double"), size = 1.5) +
+  geom_errorbar(aes(ymin = mean_WT - sem_WT, ymax = mean_WT + sem_WT, color = "WT"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_I72D - sem_I72D, ymax = mean_I72D + sem_I72D, color = "I72D"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_D90R - sem_D90R, ymax = mean_D90R + sem_D90R, color = "D90R"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_L96W - sem_L96W, ymax = mean_L96W + sem_L96W, color = "L96W"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_E110R - sem_E110R, ymax = mean_E110R + sem_E110R, color = "E110R"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_R134A - sem_R134A, ymax = mean_R134A + sem_R134A, color = "R134A"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_F212D - sem_F212D, ymax = mean_F212D + sem_F212D, color = "F212D"), width = 2.5) +
+  geom_errorbar(aes(ymin = mean_Double - sem_Double, ymax = mean_Double + sem_Double, color = "Double"), width = 2.5) +
+  labs(title = "Iron Sufficient Growth Curve", x = "Hours", y = "OD 600") +
+  theme_classic() +
+  scale_x_continuous(breaks = c(0, 12, 24, 36, 48, 60)) +
+  scale_y_log10(limits = c(0.001, 2), breaks = c(0.001, 0.01, 0.1, 1), labels = CS_break_labels) +
+  Lib_gc_options +
+  scale_color_manual(
+    values = c(
+      "I72D" = "#117733",
+      "D90R" = "#AA4499",
+      "L96W" = "#DDCC77",
+      "E110R" = "#44AA99",
+      "R134A" = "#CC6677",
+      "F212D" = "#88CCEE",
+      "WT" = "#332288",
+      "Double" = "#882255"
+    ),
+    name = "Strains"
+  )
+
+SDM_CS_2_plot
+SDM_Fe_2_plot
+
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/Fig2/SDM_CS_plot.png", plot = SDM_CS_2_plot, width = 8, height = 6, dpi = 600)
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/Fig2/SDM_CS_plot.pdf", plot = SDM_CS_2_plot, width = 8, height = 6, dpi = 600)
+
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/Fig2/SDM_Fe_plot.png", plot = SDM_Fe_2_plot, width = 8, height = 6, dpi = 600)
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/Fig2/SDM_Fe_plot.pdf", plot = SDM_Fe_2_plot, width = 8, height = 6, dpi = 600)
+
+```
+
+#Plot Ubq against Ubl
+```{r}
+Ubq_scores_file = "/Users/dtrinidad/Desktop/Paper/Ubiquitin_paper_data/DMSO_floored.csv"
+
+Ubq_scores <- read_delim(Ubq_scores_file)
+Ubq_scores <- process_hgvs_df(Ubq_scores)
+
+Ubq_scores$is.wt = Ubq_scores$mutation_type == "S"
+
+Ubq_scores$variants <- ifelse(Ubq_scores$variants == "STOP", "X", Ubq_scores$variants)
+Ubq_scores$mutation_type <- ifelse(Ubq_scores$variants == "X", "N", Ubq_scores$mutation_type)
+
+write.csv(Ubq_scores, "/Users/dtrinidad/Desktop/Paper/Ubiquitin_paper_data/Ubq_DMSOscores.csv", row.names = FALSE)
+Ubq_scores_file = "/Users/dtrinidad/Desktop/Paper/Ubiquitin_paper_data/Ubq_DMSOscores.csv"
+
+Ubq_scores <- read_delim(Ubq_scores_file)
+
+Ubq_scores$UbqScore <- as.numeric(Ubq_scores$UbqScore)
+
+#Avg missense scores
+Ubq_missense_scores <- Ubq_scores[Ubq_scores$mutation_type == "M", ]
+
+Ubq_missense_avg_scores <- Ubq_scores %>% 
+  group_by(pos) %>%
+  summarise(avg_Ubq = mean(UbqScore, na.rm=TRUE))
+
+write.csv(Ubq_missense_avg_scores, "/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/data/Ubq_missense_avg_scores.csv", row.names = FALSE)
+write.csv(Ubq_missense_avg_scores, "/Users/dtrinidad/Desktop/Paper/Ubiquitin_paper_data/Ubq_missense_avg_scores.csv", row.names = FALSE)
+
+Ubq_vs_EccDUbl_scores = read.csv("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/data/Ubq_vs_EccDUbl_scores.csv")
+
+Ubq_vs_EccDUbl_scores <- Ubq_vs_EccDUbl_scores[, !names(Ubq_vs_EccDUbl_scores) %in% "Dpos"]
+
+# make a scatterplot of scores between proteins
+Ubq_colors <- c("HydroPatch" = "orange", "HydroCore" = "red", "Lysine" = "blue", "E1 Activation" = "green", "TolerantSurf" = "yellow", "Other" = "gray")
+
+UbqvsUbl_scatter <- ggplot(Ubq_vs_EccDUbl_scores) +
+  geom_point(aes(x = Dscore, y = avg_Ubq, color = Ubq_role), alpha = 0.3, size = 2) +
+  xlab("EccD3 DMS score, CS") +
+  ylab("Ubiquitin DMS score") +
+  theme_classic() +
+  ggtitle("EccD3 Ubl vs Ubq") +
+  scale_x_continuous() +
+  scale_y_continuous() +
+  scale_color_manual(values = Ubq_colors)  # Specify custom colors
+
+print(UbqvsUbl_scatter)
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/UbqvsUbl_scatter.png", plot = UbqvsUbl_scatter, width = 6, height = 6, dpi = 600)
+
+#Just hydro
+scatter_options <- theme(
+    plot.title = element_text(hjust = 0.5, size = 30, family = "sans", color = "black"),
+    axis.title.x = element_text(size = 25, family = "sans", color = "black", margin = margin(t = 10, r = 10, b = 0, l = 10)),
+    axis.title.y = element_text(size = 25, family = "sans", color = "black", margin = margin(t = 10, r = 10, b = 0, l = 10)),
+    axis.text = element_text(size = 20, family = "sans", color = "black"),
+    legend.text = element_text(size = 20, family = "sans", color = "black"),
+    legend.title = element_text(size = 25, family = "sans", color = "black"),
+    plot.subtitle = element_text(size = 20, family = "sans", color = "black"),
+    plot.caption = element_text(size = 20, family = "sans", color = "black"),
+  )
+
+Ubq_hydrocolors <- c("HydroPatch" = "orange", "HydroCore" = "red")
+
+UbqvsUbl_scatter_hydrocolor <- ggplot(Ubq_vs_EccDUbl_scores) +
+  geom_point(aes(x = Dscore, y = avg_Ubq, color = Ubq_role), alpha = 0.75, size = 4) +
+  xlab("EccD DMS score, CS") +
+  ylab("Ubiquitin DMS score") +
+  theme_classic() +
+  ggtitle("EccD Ubl vs Ubq") +
+  scale_x_continuous() +
+  scale_y_continuous() +
+  scale_color_manual(values = Ubq_hydrocolors) + # Specify custom colors
+  scatter_options
+
+print(UbqvsUbl_scatter_hydrocolor)
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/UbqvsUbl_scatter_hydrocolor1.png", plot = UbqvsUbl_scatter_hydrocolor, width = 8, height = 6, dpi = 600)
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/UbqvsUbl_scatter_hydrocolor.pdf", plot = UbqvsUbl_scatter_hydrocolor, width = 8, height = 6, dpi = 600)
+
+print(UbqvsUbl_scatter)
+
+```
+
+#Counts
+```{r}
+#Figure out counts
+scores_ranked <- read.csv("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/eccd_scores_ranked.csv")
+
+tolerant_count_CS <- scores_ranked %>% filter(CS_phenotype == "tolerant") %>% nrow()
+tolerant_count_FeS <- scores_ranked %>% filter(FeS_phenotype == "tolerant") %>% nrow()
+
+weakLOF_count_CS <- scores_ranked %>% filter(CS_phenotype == "weak LOF") %>% nrow()
+weakLOF_count_FeS <- scores_ranked %>% filter(FeS_phenotype == "weak LOF") %>% nrow()
+
+strongLOF_count_CS <- scores_ranked %>% filter(CS_phenotype == "strong LOF") %>% nrow()
+strongLOF_count_FeS <- scores_ranked %>% filter(FeS_phenotype == "strong LOF") %>% nrow()
+
+GOF_count_CS <- scores_ranked %>% filter(CS_phenotype == "GOF") %>% nrow()
+GOF_count_FeS <- scores_ranked %>% filter(FeS_phenotype == "GOF") %>% nrow()
+
+# Calculate the total number of samples
+total_samples <- nrow(scores_ranked)
+
+cat("Number of samples ranked as 'tolerant' in CS_phenotype:", tolerant_count_CS, "\n")
+cat("Number of samples ranked as 'tolerant' in FeS_phenotype:", tolerant_count_FeS, "\n")
+cat("Total number of samples:", total_samples, "\n")
+
+cat("Number of samples ranked as 'weak LOF' in CS_phenotype:", weakLOF_count_CS, "\n")
+cat("Number of samples ranked as 'weak LOF' in FeS_phenotype:", weakLOF_count_FeS, "\n")
+
+cat("Number of samples ranked as 'strong LOF' in CS_phenotype:", strongLOF_count_CS, "\n")
+cat("Number of samples ranked as 'strong LOF' in FeS_phenotype:", strongLOF_count_FeS, "\n")
+
+cat("Number of samples ranked as 'GOF' in CS_phenotype:", GOF_count_CS, "\n")
+cat("Number of samples ranked as 'GOF' in FeS_phenotype:", GOF_count_FeS, "\n")
+
+#Repeat for missense dataset
+eccd_scores_missense <- eccd_scores_missense %>%
+  mutate(
+    CS_phenotype = case_when(
+      CS_score > 1.5 ~ "GOF",
+      CS_score <= 1.5 & CS_score >= -1 ~ "tolerant",
+      CS_score < -1 & CS_score >= -2.5 ~ "weak LOF",
+      CS_score < -2.5 ~ "strong LOF",
+      TRUE ~ NA_character_  # For values outside the specified range
+    )
+  )
+
+eccd_scores_missense <- eccd_scores_missense %>%
+  mutate(
+    FeS_phenotype = case_when(
+      Fe_score > .65 ~ "GOF",
+      Fe_score <= 0.65 & Fe_score >= -0.8 ~ "tolerant",
+      Fe_score < -0.8 & Fe_score >= -1.4 ~ "weak LOF",
+      Fe_score < -1.4 ~ "strong LOF",
+      TRUE ~ NA_character_  # For values outside the specified range
+    )
+  )
+
+eccd_scores_missense <- eccd_scores_missense %>%
+  mutate(pos_category = case_when(
+    pos >= 1 & pos <= 99 ~ "Ubl",
+    pos >= 100 & pos <= 130 ~ "linker",
+    pos > 130 ~ "TM"
+  ))
+
+eccd_Ubl_missense <- eccd_scores_missense %>%
+  filter(pos_category == "Ubl")
+
+eccd_linker_missense <- eccd_scores_missense %>%
+  filter(pos_category == "linker")
+
+eccd_TM_missense <- eccd_scores_missense %>%
+  filter(pos_category == "TM")
+
+eccd_UBL_missense <- eccd_scores_missense %>%
+  mutate(
+    CS_phenotype = case_when(
+      CS_score > 1.5 ~ "GOF",
+      CS_score <= 1.5 & CS_score >= -1 ~ "tolerant",
+      CS_score < -1 & CS_score >= -2.5 ~ "weak LOF",
+      CS_score < -2.5 ~ "strong LOF",
+      TRUE ~ NA_character_  # For values outside the specified range
+    )
+  )
+
+eccd_scores_missense <- eccd_scores_missense %>%
+  mutate(
+    FeS_phenotype = case_when(
+      Fe_score > .65 ~ "GOF",
+      Fe_score <= 0.65 & Fe_score >= -0.8 ~ "tolerant",
+      Fe_score < -0.8 & Fe_score >= -1.4 ~ "weak LOF",
+      Fe_score < -1.4 ~ "strong LOF",
+      TRUE ~ NA_character_  # For values outside the specified range
+    )
+  )
+
+
+write.csv(eccd_scores_missense, "output/eccd_scores_missense_ranked.csv", row.names=FALSE)
+
+total_samples <- nrow(eccd_scores_missense)
+
+tolerant_count_CS_miss <- eccd_scores_missense %>% filter(CS_phenotype == "tolerant") %>% nrow()
+tolerant_count_FeS_miss <- eccd_scores_missense %>% filter(FeS_phenotype == "tolerant") %>% nrow()
+
+weakLOF_count_CS_miss <- eccd_scores_missense %>% filter(CS_phenotype == "weak LOF") %>% nrow()
+weakLOF_count_FeS_miss <- eccd_scores_missense %>% filter(FeS_phenotype == "weak LOF") %>% nrow()
+
+strongLOF_count_CS_miss <- eccd_scores_missense %>% filter(CS_phenotype == "strong LOF") %>% nrow()
+strongLOF_count_FeS_miss <- eccd_scores_missense %>% filter(FeS_phenotype == "strong LOF") %>% nrow()
+
+GOF_count_CS_miss <- eccd_scores_missense %>% filter(CS_phenotype == "GOF") %>% nrow()
+GOF_count_FeS_miss <- eccd_scores_missense %>% filter(FeS_phenotype == "GOF") %>% nrow()
+
+# Calculate the total number of samples
+cat("Number of samples ranked as 'tolerant' in CS_phenotype:", tolerant_count_CS_miss, "\n")
+cat("Number of samples ranked as 'tolerant' in FeS_phenotype:", tolerant_count_FeS_miss, "\n")
+cat("Total number of samples:", total_samples, "\n")
+
+cat("Number of samples ranked as 'weak LOF' in CS_phenotype:", weakLOF_count_CS_miss, "\n")
+cat("Number of samples ranked as 'weak LOF' in FeS_phenotype:", weakLOF_count_FeS_miss, "\n")
+
+cat("Number of samples ranked as 'strong LOF' in CS_phenotype:", strongLOF_count_CS_miss, "\n")
+cat("Number of samples ranked as 'strong LOF' in FeS_phenotype:", strongLOF_count_FeS_miss, "\n")
+
+cat("Number of samples ranked as 'GOF' in CS_phenotype:", GOF_count_CS_miss, "\n")
+cat("Number of samples ranked as 'GOF' in FeS_phenotype:", GOF_count_FeS_miss, "\n")
+
+#Ubl
+
+tolerant_count_CS_Ublmiss <- eccd_Ubl_missense %>% filter(CS_phenotype == "tolerant") %>% nrow()
+tolerant_count_FeS_Ublmiss <- eccd_Ubl_missense %>% filter(FeS_phenotype == "tolerant") %>% nrow()
+
+weakLOF_count_CS_Ublmiss <- eccd_Ubl_missense %>% filter(CS_phenotype == "weak LOF") %>% nrow()
+weakLOF_count_FeS_Ublmiss <- eccd_Ubl_missense %>% filter(FeS_phenotype == "weak LOF") %>% nrow()
+
+strongLOF_count_CS_Ublmiss <- eccd_Ubl_missense %>% filter(CS_phenotype == "strong LOF") %>% nrow()
+strongLOF_count_FeS_Ublmiss <- eccd_Ubl_missense %>% filter(FeS_phenotype == "strong LOF") %>% nrow()
+
+GOF_count_CS_Ublmiss <- eccd_Ubl_missense %>% filter(CS_phenotype == "GOF") %>% nrow()
+GOF_count_FeS_Ublmiss <- eccd_Ubl_missense %>% filter(FeS_phenotype == "GOF") %>% nrow()
+
+# Calculate the total number of samples
+total_samples <- nrow(eccd_Ubl_missense)
+
+cat("Number of samples ranked as 'tolerant' in CS_phenotype:", tolerant_count_CS_Ublmiss, "\n")
+cat("Number of samples ranked as 'tolerant' in FeS_phenotype:", tolerant_count_FeS_Ublmiss, "\n")
+cat("Total number of samples:", total_samples, "\n")
+
+cat("Number of samples ranked as 'weak LOF' in CS_phenotype:", weakLOF_count_CS_Ublmiss, "\n")
+cat("Number of samples ranked as 'weak LOF' in FeS_phenotype:", weakLOF_count_FeS_Ublmiss, "\n")
+
+cat("Number of samples ranked as 'strong LOF' in CS_phenotype:", strongLOF_count_CS_Ublmiss, "\n")
+cat("Number of samples ranked as 'strong LOF' in FeS_phenotype:", strongLOF_count_FeS_Ublmiss, "\n")
+
+cat("Number of samples ranked as 'GOF' in CS_phenotype:", GOF_count_CS_Ublmiss, "\n")
+cat("Number of samples ranked as 'GOF' in FeS_phenotype:", GOF_count_FeS_Ublmiss, "\n")
+
+#TM
+tolerant_count_CS_TMmiss <- eccd_TM_missense %>% filter(CS_phenotype == "tolerant") %>% nrow()
+tolerant_count_FeS_TMmiss <- eccd_TM_missense %>% filter(FeS_phenotype == "tolerant") %>% nrow()
+
+weakLOF_count_CS_TMmiss <- eccd_TM_missense %>% filter(CS_phenotype == "weak LOF") %>% nrow()
+weakLOF_count_FeS_TMmiss <- eccd_TM_missense %>% filter(FeS_phenotype == "weak LOF") %>% nrow()
+
+strongLOF_count_CS_TMmiss <- eccd_TM_missense %>% filter(CS_phenotype == "strong LOF") %>% nrow()
+strongLOF_count_FeS_TMmiss <- eccd_TM_missense %>% filter(FeS_phenotype == "strong LOF") %>% nrow()
+
+GOF_count_CS_TMmiss <- eccd_TM_missense %>% filter(CS_phenotype == "GOF") %>% nrow()
+GOF_count_FeS_TMmiss <- eccd_TM_missense %>% filter(FeS_phenotype == "GOF") %>% nrow()
+
+# Calculate the total number of samples
+total_samples <- nrow(eccd_TM_missense)
+
+cat("Number of samples ranked as 'tolerant' in CS_phenotype:", tolerant_count_CS_TMmiss, "\n")
+cat("Number of samples ranked as 'tolerant' in FeS_phenotype:", tolerant_count_FeS_TMmiss, "\n")
+cat("Total number of samples:", total_samples, "\n")
+
+cat("Number of samples ranked as 'weak LOF' in CS_phenotype:", weakLOF_count_CS_TMmiss, "\n")
+cat("Number of samples ranked as 'weak LOF' in FeS_phenotype:", weakLOF_count_FeS_TMmiss, "\n")
+
+cat("Number of samples ranked as 'strong LOF' in CS_phenotype:", strongLOF_count_CS_TMmiss, "\n")
+cat("Number of samples ranked as 'strong LOF' in FeS_phenotype:", strongLOF_count_FeS_TMmiss, "\n")
+
+cat("Number of samples ranked as 'GOF' in CS_phenotype:", GOF_count_CS_TMmiss, "\n")
+cat("Number of samples ranked as 'GOF' in FeS_phenotype:", GOF_count_FeS_TMmiss, "\n")
+
+#T0 counts
+t0_counts <- read.csv("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/T0counts.csv")
+
+total_counts <- t0_counts %>% filter(total_counts) %>% nrow()
+
+# Print the result
+cat("Number of rows with total_counts:", total_counts, "\n")
+
+```
+
+#CS vs FeS, Histograms & Density
+```{r}
+# Plot histogram of avg_CS
+avg_CS_histogram <- ggplot(avg_missense_scores, aes(x = avg_CS)) +
+  geom_histogram(binwidth = 0.5, fill = "skyblue", color = "black") +
+  labs(x = "Average CS Score", y = "Frequency", title = "Distribution of Positional Average Missense CS Scores")
+
+print(avg_CS_histogram)
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/avgpos_missense_CS_histogram.png", plot = avg_CS_histogram)
+
+mean_avg_CS <- mean(avg_scores$avg_CS)
+cat("Mean avg_CS score:", mean_avg_CS, "\n")
+sd_avg_CS <- sd(avg_scores$avg_CS)
+cat("Standard Deviation of avg_CS:", sd_avg_CS, "\n")
+
+print(mean_avg_CS)
+cs_buried_miss_quartiles <- quantile(avg_missense_scores$avg_CS, c(0.25, 0.5, 0.75), na.rm = TRUE)
+
+# BURIED
+#25th Percentile (Q1): -0.06491711 
+#50th Percentile (Q2, Median): 0.08259334 
+#75th Percentile (Q3): 0.1552615
+cat("25th Percentile (Q1):", cs_buried_miss_quartiles[1], "\n")
+cat("50th Percentile (Q2, Median):", cs_buried_miss_quartiles[2], "\n")
+cat("75th Percentile (Q3):", cs_buried_miss_quartiles[3], "\n")
+
+# Plot histogram of avg_Fe
+avg_Fe_histogram <- ggplot(avg_missense_scores, aes(x = avg_Fe)) +
+  geom_histogram(binwidth = 0.5, fill = "lightgreen", color = "black") +
+  labs(x = "Average FeS Score", y = "Frequency", title = "Distribution of Positional Average Missense FeS Scores")
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/avgpos_missense_FeS_histogram.png", plot = avg_Fe_histogram)
+
+print(avg_CS_histogram)
+print(avg_Fe_histogram)
+
+#Both together
+avg_CS_histogram <- ggplot(avg_missense_scores, aes(x = avg_CS)) +
+  geom_histogram(binwidth = 0.5, fill = "skyblue", color = "black") +
+  labs(x = "Average CS Score", y = "Frequency", title = "Distribution of Positional Average Missense CS Scores")
+
+avg_Fe_histogram <- ggplot(avg_missense_scores, aes(x = avg_Fe)) +
+  geom_histogram(binwidth = 0.5, fill = "lightgreen", color = "black") +
+  labs(x = "Average FeS Score", y = "Frequency", title = "Distribution of Positional Average Missense FeS Scores")
+
+avg_missense_scores_combined <- avg_missense_scores %>%
+  gather(key = "Score_Type", value = "Score", avg_CS, avg_Fe)
+
+avg_missense_scores_combined_ranked <- avg_missense_scores_combined %>%
+  mutate(
+    phenotype = case_when(
+      avg_CS > 1.5 ~ "GOF",
+      avg_CS <= 1.5 & CS_score >= -1 ~ "tolerant",
+      avg_CS < -1 & CS_score >= -2.5 ~ "weak LOF",
+      avg_CS < -2.5 ~ "strong LOF",
+      TRUE ~ NA_character_  # For values outside the specified range
+    )
+  )
+
+    FeS_phenotype = case_when(
+      Fe_score > .65 ~ "GOF",
+      Fe_score <= 0.65 & Fe_score >= -0.8 ~ "tolerant",
+      Fe_score < -0.8 & Fe_score >= -1.4 ~ "weak LOF",
+      Fe_score < -1.4 ~ "strong LOF",
+      TRUE ~ NA_character_  # For values outside the specified range
+    )
+
+avg_histogram <- ggplot(avg_missense_scores_combined, aes(x = Score, fill = Score_Type)) +
+  geom_histogram(binwidth = 0.5, color = "black", alpha = 0.5, position = "identity") +
+  scale_fill_manual(values = c("purple", "darkgreen")) +
+  labs(x = "Score", y = "Frequency", title = "Distribution of Positional Average Missense Scores") +
+  theme_classic()
+
+print(avg_histogram)
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/avgpos_missense_combined_histogram.png", plot = avg_histogram)
+
+#Add lines
+install.packages("ggpattern")
+library(ggpattern)
+
+avg_histogram_lines <- ggplot(avg_missense_scores_combined, aes(x = Score, fill = Score_Type)) +
+  geom_histogram(binwidth = .3, color = "black", alpha = 0.5, position = "stack") +
+  scale_fill_manual(values = c("purple", "darkgreen")) +
+  labs(x = "Score", y = "Frequency", title = "Distribution of Positional Average Missense Scores") +
+  theme_classic() +
+  theme_options
+
+
+print(avg_histogram_lines)
+print(avg_histogram)
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/avgpos_missense_combined_histogram_lines.png", plot = avg_histogram_lines, width = 8, height = 6, dpi = 600)
+
+missense_data_trim <- eccd_scores_missense %>%
+  select(hgvs, CS_score, Fe_score, pos)
+
+missense_data_trim2 <- missense_data_trim %>%
+  gather(key = "Condition", value = "Score", CS_score, Fe_score)
+
+missense_data_tol <- missense_data_trim2 %>%
+  filter(Score >= -0.5)
+
+missense_data_tol_LOF <- missense_data_trim2 %>%
+  filter(Score < 0)
+
+missense_data_LOF <- missense_data_trim2 %>%
+  filter(Score < -0.8)
+
+avg_histogram <- ggplot(missense_data_trim2, aes(x = Score, fill = Condition)) +
+  geom_histogram(binwidth = .5, color = "black", alpha = 0.5, position = "stack") +
+  scale_fill_manual(values = c("purple", "darkgreen"),
+                    labels = c("CS_score" = "Iron Deficient", "Fe_score" = "Iron Sufficient")) +
+  labs(x = "Score", y = "Frequency", title = "Distribution of Missense Scores") +
+  theme_classic() +
+  theme_options
+
+avg_histogram_tol <- ggplot(missense_data_tol, aes(x = Score, fill = Condition)) +
+  geom_histogram(binwidth = .5, color = "black", alpha = 0.5, position = "stack") +
+  scale_fill_manual(values = c("purple", "darkgreen")) +
+  labs(x = "Score", y = "Frequency", title = "Distribution of Tol Missense Scores") +
+  theme_classic() +
+  theme_options
+
+avg_histogram_tol_LOF <- ggplot(missense_data_tol_LOF, aes(x = Score, fill = Condition)) +
+  geom_histogram(binwidth = .5, color = "black", alpha = 0.5, position = "stack") +
+  scale_fill_manual(values = c("purple", "darkgreen")) +
+  labs(x = "Score", y = "Frequency", title = "Distribution of Missense Scores") +
+  theme_classic() +
+  theme_options
+
+avg_histogram_tol_LOF
+
+avg_histogram_LOF <- ggplot(missense_data_LOF, aes(x = Score, fill = Condition)) +
+  geom_histogram(binwidth = .3, color = "black", alpha = 0.5, position = "stack") +
+  scale_fill_manual(values = c("purple", "darkgreen")) +
+  labs(x = "Score", y = "Frequency", title = "Distribution of LOF Missense Scores") +
+  theme_classic() +
+  theme_options
+
+avg_histogram_LOF2 <- ggplot(missense_data_LOF, aes(x = Score, fill = Condition)) +
+  geom_histogram(binwidth = .5, color = "black", alpha = 0.5, position = "stack") +
+  scale_fill_manual(values = c("purple", "darkgreen"),
+                    labels = c("CS_score" = "Iron Deficient", "Fe_score" = "Iron Sufficient")) +
+  labs(x = "Score", y = "Frequency", title = "LOF Missense Scores") +
+  theme_classic() +
+  theme_options
+
+print(avg_histogram)
+print(avg_histogram_tol)
+print(avg_histogram_tol_LOF)
+print(avg_histogram_LOF)
+print(avg_histogram_LOF2)
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/missense_histogram.png", plot = avg_histogram, width = 8, height = 6, dpi = 600)
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/missense_histogram.pdf", plot = avg_histogram, width = 8, height = 6, dpi = 600)
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/missense_tol_combined_histogram.png", plot = avg_histogram_tol, width = 8, height = 6, dpi = 600)
+
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/Fig2/missense_LOF_combined_histogram.png", plot = avg_histogram_LOF2, width = 8, height = 6, dpi = 600)
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/missense_LOF_combined_histogram.pdf", plot = avg_histogram_LOF2, width = 8, height = 6, dpi = 600)
+
+CS_histogram <- ggplot(missense_data, aes(x = CS_score)) +
+  geom_histogram(binwidth = 0.2, fill = "skyblue", color = "black") +
+  labs(x = "Average CS Score", y = "Frequency", title = "Distribution of Positional Average Missense CS Scores")
+
+print(CS_histogram)
+
+
+miss_density <- ggplot(missense_data %>% filter(mutation_type != "X" & experiment == "EccD")) +
+  geom_density(aes(x = CS_score & Fe_score, color=mutation_type), bw = "nrd0", kernel='gaussian', linewidth=1) +
+  xlab("Enrich2 score") +
+  ylab("Density") +
+  geom_vline(xintercept = 0, linetype="dotted") +
+  theme_classic() +
+  ggtitle("Chelated media, avg") +
+  scale_color_manual(values=colorscheme_1) +
+  labs(color = "Mutation type")
+
+miss_density
+
+miss_density_separate <- ggplot(missense_data_long) +
+  geom_density(aes(x = Score, color = mutation_type), bw = "nrd0", kernel = "gaussian", linewidth = 1) +
+  xlab("Enrich2 score") +
+  ylab("Density") +
+  geom_vline(xintercept = 0, linetype = "dotted") +
+  theme_classic() +
+  ggtitle("Chelated media, avg") +
+  scale_color_manual(values = colorscheme_1) +
+  labs(color = "Mutation type", linetype = "Score Type") +
+  facet_wrap(~ Score_Type, scales = "free_x")
+
+miss_density_separate
+
+miss_density <- ggplot(missense_data_long) +
+  geom_density(aes(x = Score, color = Score_Type), 
+               bw = "nrd0", kernel = "gaussian", linewidth = 1) +
+  xlab("Enrich2 score") +
+  ylab("Density") +
+  theme_classic() +
+  theme_options +
+  ggtitle("Distribution of Missense Scores") +
+  scale_color_manual(values = c("CS_score" = "mediumorchid", "Fe_score" = "forestgreen"),
+                     labels = c("CS_score" = "Iron Deficient", "Fe_score" = "Iron Sufficient", "Score_Type" = "Condition")) +
+  labs(color = "Condition")
+
+# Plot
+miss_density
+
+miss_density_LOF <- ggplot(missense_data_LOF) +
+  geom_density(aes(x = Score, color = Condition), 
+               bw = "nrd0", kernel = "gaussian", linewidth = 1) +
+  xlab("Enrich2 score") +
+  ylab("Density") +
+  theme_classic() +
+  theme_options +
+  ggtitle("LOF Missense Scores") +
+  scale_color_manual(values = c("CS_score" = "mediumorchid", "Fe_score" = "forestgreen"),
+                     labels = c("CS_score" = "Iron Deficient", "Fe_score" = "Iron Sufficient")) +
+  labs(color = "Condition")
+
+miss_density_tol_LOF <- ggplot(missense_data_tol_LOF) +
+  geom_density(aes(x = Score, color = Condition), 
+               bw = "nrd0", kernel = "gaussian", linewidth = 1) +
+  xlab("Enrich2 score") +
+  ylab("Density") +
+  theme_classic() +
+  theme_options +
+  ggtitle("LOF Missense Scores") +
+  scale_color_manual(values = c("CS_score" = "mediumorchid", "Fe_score" = "forestgreen"),
+                     labels = c("CS_score" = "Iron Deficient", "Fe_score" = "Iron Sufficient")) +
+  labs(color = "Condition")
+
+# Plot
+miss_density
+miss_density_LOF
+miss_density_tol_LOF
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/missense_density.png", plot = miss_density, width = 8, height = 6, dpi = 600)
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/missense_density.pdf", plot = miss_density, width = 8, height = 6, dpi = 600)
+
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/missense_LOF_density.png", plot = miss_density_LOF, width = 8, height = 6, dpi = 600)
+ggsave("/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/output/missense_LOF_density.pdf", plot = miss_density_LOF, width = 8, height = 6, dpi = 600)
+
+```
+
+#Replicates
+```{r}
+#Plot replicates and determine correlations
+
+install.packages("GGally")
+
+library(MASS)
+library(ggplot2)
+library(dplyr)
+library(bio3d)
+library(tidyverse)
+library(colorspace)
+library(cowplot)
+library(ggpubr)
+library(patchwork)
+library(GGally)
+
+eccd_scores_shared_file = "/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/EccD3_Biohub_All_exp/main_identifiers_scores_shared.tsv"
+
+eccd_scores_shared_colnames <- c("hgvs", "CS_R1_tile1_SE", "CS_R1_tile1",
+                                 "CS_R2_tile1_SE", "CS_R2_tile1",
+                                 "CS_R3_tile1_SE", "CS_R3_tile1",
+                                 "CS_R1_tile2_SE", "CS_R1_tile2",
+                                 "CS_R2_tile2_SE", "CS_R2_tile2",
+                                 "CS_R3_tile2_SE", "CS_R3_tile2",
+                                 "CS_R1_tile3_SE", "CS_R1_tile3",
+                                 "CS_R2_tile3_SE", "CS_R2_tile3",
+                                 "CS_R3_tile3_SE", "CS_R3_tile3",
+                                 "Fe_R1_tile1_SE", "Fe_R1_tile1",
+                                 "Fe_R2_tile1_SE", "Fe_R2_tile1",
+                                 "Fe_R3_tile1_SE", "Fe_R3_tile1",
+                                 "Fe_R1_tile2_SE", "Fe_R1_tile2",
+                                 "Fe_R2_tile2_SE", "Fe_R2_tile2",
+                                 "Fe_R3_tile2_SE", "Fe_R3_tile2",
+                                 "Fe_R1_tile3_SE", "Fe_R1_tile3",
+                                 "Fe_R2_tile3_SE", "Fe_R2_tile3",
+                                 "Fe_R3_tile3_SE", "Fe_R3_tile3")
+
+eccd_scores_shared_coltypes <- c("character", "numeric", "numeric",
+                                "numeric", "numeric",
+                                "numeric", "numeric",
+                                "numeric", "numeric",
+                                "numeric", "numeric",
+                                "numeric", "numeric",
+                                "numeric", "numeric",
+                                "numeric", "numeric",
+                                "numeric", "numeric",
+                                "numeric", "numeric",
+                                "numeric", "numeric",
+                                "numeric", "numeric",
+                                "numeric", "numeric",
+                                "numeric", "numeric",
+                                "numeric", "numeric",
+                                "numeric", "numeric",
+                                "numeric", "numeric",
+                                "numeric", "numeric")
+
+eccd_scores_shared <- read_delim(eccd_scores_shared_file, col_names = eccd_scores_shared_colnames, skip=5)
+
+#By tile
+plot_SI_correlation_CS_T1 <- ggpairs(eccd_scores_shared, columns=c('CS_R1_tile1', 'CS_R2_tile1', 'CS_R3_tile1')) +
+  theme_classic()
+plot_SI_correlation_CS_T2 <- ggpairs(eccd_scores_shared, columns=c('CS_R1_tile2', 'CS_R2_tile2', 'CS_R3_tile2')) +
+  theme_classic()
+plot_SI_correlation_CS_T3 <- ggpairs(eccd_scores_shared, columns=c('CS_R1_tile3', 'CS_R2_tile3', 'CS_R3_tile3')) +
+  theme_classic()
+
+plot_SI_correlation_Fe_T1 <- ggpairs(eccd_scores_shared, columns=c('Fe_R1_tile1', 'Fe_R2_tile1', 'Fe_R3_tile1')) +
+  theme_classic()
+plot_SI_correlation_Fe_T2 <- ggpairs(eccd_scores_shared, columns=c('Fe_R1_tile2', 'Fe_R2_tile2', 'Fe_R3_tile2')) +
+  theme_classic()
+plot_SI_correlation_Fe_T3 <- ggpairs(eccd_scores_shared, columns=c('Fe_R1_tile3', 'Fe_R2_tile3', 'Fe_R3_tile3')) +
+  theme_classic()
+
+plot_SI_correlation_CS_T1
+plot_SI_correlation_CS_T2
+plot_SI_correlation_CS_T3
+
+plot_SI_correlation_Fe_T1
+plot_SI_correlation_Fe_T2
+plot_SI_correlation_Fe_T3
+
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/SI/correlation_CS_T1.pdf", plot = plot_SI_correlation_CS_T1, width = 8, height = 6, dpi = 600)
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/SI/correlation_CS_T2.pdf", plot = plot_SI_correlation_CS_T2, width = 8, height = 6, dpi = 600)
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/SI/correlation_CS_T3.pdf", plot = plot_SI_correlation_CS_T3, width = 8, height = 6, dpi = 600)
+
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/SI/correlation_Fe_T1.pdf", plot = plot_SI_correlation_Fe_T1, width = 8, height = 6, dpi = 600)
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/SI/correlation_Fe_T2.pdf", plot = plot_SI_correlation_Fe_T2, width = 8, height = 6, dpi = 600)
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/SI/correlation_Fe_T3.pdf", plot = plot_SI_correlation_Fe_T3, width = 8, height = 6, dpi = 600)
+
+#Counts
+#Plot library coverage and variants observed
+eccD_counts_unselected_T1_file ="/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/EccD3_Biohub_All_exp/counts-selected/1_T0_1_CS.csv"
+eccD_counts_unselected_T2_file ="/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/EccD3_Biohub_All_exp/counts-selected/1_T0_2_CS.csv"
+eccD_counts_unselected_T3_file ="/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/EccD3_Biohub_All_exp/counts-selected/1_T0_3_CS.csv"
+
+eccD_counts_unselected_combined_file ="/Users/dtrinidad/Desktop/EccD3_DMS/Biohub_Miseq/EccD3_Biohub_All_exp/counts-selected/T0_combined.csv"
+
+eccD_counts_unselected_T1 <- read_delim(eccD_counts_unselected_T1_file)
+eccD_counts_unselected_T2 <- read_delim(eccD_counts_unselected_T2_file)
+eccD_counts_unselected_T3 <- read_delim(eccD_counts_unselected_T3_file)
+
+eccD_counts_unselected_combined <- read_delim(eccD_counts_unselected_combined_file)
+
+plot_T1 <- eccD_counts_unselected_T1 %>% filter(mutation_type != "X") %>% group_by(pos) %>% summarize(count = sum(count)) %>%
+  ggplot(aes(x=pos, y=count)) +
+  geom_bar(stat="identity", width=1.0) +
+  scale_y_log10() + 
+  xlab("Position (AA)") + 
+  ylab("Count") +
+  labs(color = "Mutation type") +
+  theme_classic() +
+   xlim(0, 200)
+
+print(plot_T1)
+
+plot_T2 <- eccD_counts_unselected_T2 %>% filter(mutation_type != "X") %>% group_by(pos) %>% summarize(count = sum(count)) %>%
+  ggplot(aes(x=pos, y=count)) +
+  geom_bar(stat="identity", width=1.0) +
+  scale_y_log10() + 
+  xlab("Position (AA)") + 
+  ylab("Count") +
+  labs(color = "Mutation type") +
+  theme_classic() +
+   xlim(100,300)
+
+print(plot_T2)
+
+plot_T3 <- eccD_counts_unselected_T3 %>% filter(mutation_type != "X") %>% group_by(pos) %>% summarize(count = sum(count)) %>%
+  ggplot(aes(x=pos, y=count)) +
+  geom_bar(stat="identity", width=1.0) +
+  scale_y_log10() + 
+  xlab("Position (AA)") + 
+  ylab("Count") +
+  labs(color = "Mutation type") +
+  theme_classic() +
+   xlim(200,400)
+
+print(plot_T3)
+
+plot_total <- eccD_counts_unselected_combined %>% filter(mutation_type != "X") %>% group_by(pos) %>% summarize(count = sum(count)) %>%
+  ggplot(aes(x=pos, y=count)) +
+  geom_bar(stat="identity", width=1.0) +
+  scale_y_log10() + 
+  xlab("Position (AA)") + 
+  ylab("Count") +
+  labs(color = "Mutation type") +
+  theme_classic() 
+
+print(plot_total)
+
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/SI/coverage_T1.pdf", plot = plot_T1, width = 8, height = 6, dpi = 600)
+
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/SI/coverage_T2.pdf", plot = plot_T2, width = 8, height = 6, dpi = 600)
+
+ggsave("/Users/dtrinidad/Desktop/Paper/Figures/SI/coverage_T3.pdf", plot = plot_T3, width = 8, height = 6, dpi = 600)
+
+
+```
