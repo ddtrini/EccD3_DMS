@@ -1,0 +1,129 @@
+#colors
+#EccE Pink
+set_color epink, [255, 94, 140]
+
+#Light green
+set_color dbentgreen, [95, 146, 42]
+
+#Dark green
+set_color dextgreen, [3, 75, 4]
+
+#EccB is tv_orange
+
+#EccC Blue:
+set_color cblue, [99, 156, 214]
+
+color tv_orange, chain D+I
+color cblue, chain E+J
+
+sele Dbent_Ublcore, (eccD3_CS_avgmissense and chain B and (resi 10 or resi 12 or resi 14 or resi 27 or resi 29 or resi 35 or resi 38 or resi 42 or resi 69 or resi 83 or resi 96))
+sele Dext_Ublcore, (eccD3_CS_avgmissense and chain C and (resi 10 or resi 12 or resi 14 or resi 27 or resi 29 or resi 35 or resi 38 or resi 42 or resi 69 or resi 83 or resi 96))
+
+color white, chain B+C and resi 101-401
+
+#Highlight scores, just Ubl domain
+spectrum b,  red_white_blue, eccD3_CS_avgmissense and resi 1-100, minimum=-2,maximum = 2
+color white, resi 91-94+99-101
+
+#Show the only resis that have an effect at interfaces. Color I72D by charged, color D90 by hydro
+show licorice, chain B+C and resi 72+90
+
+#Full soluble domain view, including other ESX-3 parts
+set_view (\
+     0.935802102,    0.242592588,    0.255773544,\
+    -0.346457660,    0.498921305,    0.794381201,\
+     0.065100998,   -0.832000017,    0.550941706,\
+    -0.000001013,   -0.000209691, -182.961746216,\
+   135.348358154,  175.704986572,  222.402526855,\
+    93.439674377,  272.380340576,  -20.000000000 )
+
+png /Users/dtrinidad/Desktop/Paper/Figures/Fig3/ESX3_solubledomains
+
+#Ubl_ext and EccC interface. Also shows I72 extending into Ubl_bent
+set_view (\
+     0.769817233,    0.200520247,    0.605946064,\
+    -0.618395209,    0.469342321,    0.630318344,\
+    -0.158004537,   -0.859946251,    0.485310376,\
+     0.000286467,   -0.000255354,  -89.571731567,\
+   136.145996094,  167.908264160,  232.599441528,\
+  -8365.369140625, 8544.322265625,  -20.000000000 )
+
+png /Users/dtrinidad/Desktop/Paper/Figures/Fig3/EccD3_Ublext_interfaces
+
+#Another view, to show off resi's from interacting partner
+set_view (\
+     0.799882591,    0.366574436,    0.475195110,\
+    -0.432596952,   -0.196652889,    0.879878700,\
+     0.415990114,   -0.909367621,    0.001280959,\
+     0.000068109,    0.000011034, -101.099296570,\
+   126.934509277,  154.197555542,  226.635223389,\
+   -18.915187836,  221.134262085,  -20.000000000 )
+
+show licorice, 6umm and chain B and resi 29+33+38
+hide everything, chain A
+show licorice, chain E and resi 1-2
+
+png /Users/dtrinidad/Desktop/Paper/Figures/Fig3/EccD3_Ublext_interfaces2
+
+#Dext and EccC interface
+set_view (\
+     0.749254942,    0.447635025,    0.488095522,\
+    -0.543035984,   -0.006637180,    0.839680016,\
+     0.379110336,   -0.894188583,    0.238111928,\
+     0.000102416,    0.000584517,  -82.395324707,\
+   136.566375732,  167.678222656,  228.705627441,\
+    -7.200304031,  171.740341187,  -20.000000000 )
+
+
+#Dbent and EccE interface
+set_view (\
+     0.884377241,    0.433273405,    0.173639566,\
+    -0.175993219,   -0.035028290,    0.983768642,\
+     0.432322741,   -0.900582254,    0.045274369,\
+    -0.000125468,   -0.000124883,  -65.202323914,\
+   134.053878784,  184.780181885,  201.988601685,\
+   -54.832241058,  185.217269897,  -20.000000000 )
+
+png /Users/dtrinidad/Desktop/Paper/Figures/Fig3/EccD3_Ublbent_interfaces
+
+#Use Ubl_ext for core shots.
+
+set cartoon_transparency, 0.6, Ext_Ubl
+set cartoon_transparency, 0, Dext_Ublcore
+
+#side view
+set_view (\
+     0.865881979,    0.491263121,   -0.094299100,\
+    -0.009419751,    0.204480678,    0.978819728,\
+     0.500142813,   -0.846658826,    0.181693718,\
+    -0.003507925,   -0.000131510,  -74.173835754,\
+   126.021324158,  164.562896729,  225.978530884,\
+  -345.562042236,  493.696014404,  -20.000000000 )
+
+  ray
+  png /Users/dtrinidad/Desktop/Paper/Figures/Fig3/Ext_core
+
+#View to show off beta grasp fold
+set_view (\
+     0.419830650,   -0.871972680,   -0.251761883,\
+    -0.836936891,   -0.264653116,   -0.479035318,\
+     0.351070821,    0.411827981,   -0.840911031,\
+    -0.000846721,    0.002675138,  -89.501152039,\
+   128.044097900,  163.394226074,  226.352600098,\
+  -330.055084229,  509.202972412,  -20.000000000 )
+
+  ray
+  png /Users/dtrinidad/Desktop/Paper/Figures/Fig3/Ext_core_fold
+
+#Show off DMS colored Ddimer, in contact with E and C. No surface
+
+set_view (\
+     0.932741463,    0.216886938,    0.288002729,\
+    -0.353409737,    0.391998231,    0.849368751,\
+     0.071320802,   -0.894028306,    0.442289531,\
+    -0.000290829,   -0.000077218, -169.260498047,\
+   130.563415527,  176.656509399,  222.356414795,\
+  -29465.917968750, 29803.236328125,  -20.000000000 )
+
+set cartoon_transparency, 0.5,6umm and chain A or chain E
+png /Users/dtrinidad/Desktop/Paper/Figures/Fig3/EccD3_Ubl_dimer
